@@ -28,7 +28,7 @@ import {
 } from '@ionic/angular';
 import type { Timestamp } from 'firebase/firestore';
 import { addIcons } from 'ionicons';
-import { camera, close, image as imageIcon, mic } from 'ionicons/icons';
+import { camera, close, image as imageIcon, mic, trash } from 'ionicons/icons';
 import { PhotoService, TodoListService } from '../../core';
 import {
   CATEGORIES,
@@ -102,7 +102,7 @@ export class ItemDetailsModalComponent implements OnInit {
   private readonly speech = inject(SpeechService);
 
   constructor() {
-    addIcons({ camera, close, image: imageIcon, mic });
+    addIcons({ camera, close, image: imageIcon, mic, trash });
     inject(DestroyRef).onDestroy(() => {
       const url = this.existingPhoto();
       if (url) {
@@ -136,6 +136,20 @@ export class ItemDetailsModalComponent implements OnInit {
     if (this.item) {
       await this.save(this.item, 'נשמר');
     }
+  }
+
+  // Not awaited, so it works offline; the list drops the item from its cache at once.
+  protected async remove(): Promise<void> {
+    const item = this.item;
+    if (!item) {
+      return;
+    }
+    void this.todoLists
+      .deleteItem(this.listId, item.id)
+      .then(() => (item.photoPath ? this.photos.removeQuietly(item.photoPath) : undefined))
+      .catch(() => this.alert.presentToast('המחיקה נכשלה'));
+    await this.alert.presentToast('נמחק');
+    await this.dismiss(true);
   }
 
   protected async takePicture(): Promise<void> {

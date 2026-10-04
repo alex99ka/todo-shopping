@@ -239,8 +239,12 @@ Before delivering any UI code, verify:
 ## Project decisions (override the generated values above)
 
 - **Primary is `#047857` (emerald-700), not `#059669`.** White toolbar/button text on `#059669` is 3.8:1 and fails WCAG AA; on `#047857` it is 5.5:1. Dark mode uses `#34d399` with black text, toolbars stay deep green `#064e3b` with white text.
-- **Amber is an accent only** (`--app-accent-soft` / `--app-accent-ink`): the Shopping list monogram and reminder times. Never as a text color on white below `#92400e`.
-- **Fonts are self-hosted** via `@fontsource-variable/rubik` (headings; covers Hebrew item names) and `@fontsource-variable/nunito-sans` (body) — the Android app must work offline and the CSP allows no third-party font hosts.
+- **Amber is an accent only** (`--app-accent-soft` / `--app-accent-ink`, `tertiary` for fills). Never as a text color on white below `#92400e`.
+- **List types have their own identity.** Shopping = amber: basket icon, aisle headings, count pills, checkboxes, progress bar, add button. Tasks = green: checkbox icon, primary everything. The toolbar stays brand green for both (amber can't carry white text).
+- **RTL.** `<html dir="rtl" lang="he">`; use logical properties only (`margin-inline`, `padding-inline`), never left/right. User text gets `dir="auto"`.
+- **Deadline chips:** pill with icon and words; late = `--app-danger-soft`/`--app-danger-ink` plus the word "באיחור", today/reminder = accent, later = neutral. Colour is never the only signal.
+- **Every swipe action has a tap alternative** (WCAG 2.2 dragging): item delete in the editor, list rename/delete in the list's ⋮ menu.
+- **One font, Rubik, self-hosted** via `@fontsource-variable/rubik`. The UI is Hebrew and Nunito Sans has no Hebrew glyphs, so it was dropped (the generated pairing above is superseded). Self-hosted because the Android app must work offline and the CSP allows no third-party font hosts.
 - **Tokens live in `src/theme/variables.scss`**; components use `var(--ion-color-*)` / `var(--app-*)`, never raw hex.
 - **Lists are checklists, not cards:** `ion-list inset`, 56px rows, a checkbox with a 44px hit area at the start, tap the text to edit, swipe left for destructive actions, a FAB for "add".
 - **Buttons are sentence case**; icon-only buttons always carry `aria-label`, decorative icons `aria-hidden="true"`.

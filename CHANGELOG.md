@@ -19,12 +19,18 @@ versions reach installed apps as an in-app update.
   later, no deadline and done; overdue tasks show in red, high priority with a flag.
 - Shopping lists keep the aisle grouping and move checked items to an "in the basket"
   section at the end.
+- Each list type has its own look: shopping lists use the amber accent (basket icon,
+  aisle headings, checkboxes, add button), task lists the green one.
+- Deadline and reminder chips, and a progress bar for what is left.
+- Non-swipe ways to do everything a swipe does: delete from the item editor, rename and
+  delete a list from its menu.
 - Works offline: lists are cached on the device, and items you add, check off or
   delete while offline sync when the connection returns.
 
 ### Changed
 
 - The whole interface is in Hebrew and right-to-left, including notifications.
+  One typeface, Rubik (it covers Hebrew); Nunito Sans is gone.
   Voice input listens in Hebrew.
 
 ### Fixed

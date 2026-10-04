@@ -5,7 +5,8 @@
 
 :root {
   --app-font-heading: 'Rubik Variable', system-ui, sans-serif;
-  --ion-font-family: 'Nunito Sans Variable', 'Rubik Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  // One family: Rubik is drawn for Hebrew as well as Latin (Nunito Sans has no Hebrew).
+  --ion-font-family: 'Rubik Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --ion-background-color: #f3faf7;
   --ion-background-color-rgb: 243, 250, 247;
@@ -18,6 +19,8 @@
   --app-primary-soft: #d1fae5;
   --app-accent-soft: #fef3c7;
   --app-accent-ink: #92400e;
+  --app-danger-soft: #fee2e2;
+  --app-danger-ink: #b91c1c;
 
   --ion-color-primary: #047857;
   --ion-color-primary-rgb: 4, 120, 87;
@@ -97,6 +100,8 @@
     --app-primary-soft: #064e3b;
     --app-accent-soft: #451a03;
     --app-accent-ink: #fbbf24;
+    --app-danger-soft: #450a0a;
+    --app-danger-ink: #fca5a5;
 
     --ion-color-primary: #34d399;
     --ion-color-primary-rgb: 52, 211, 153;

@@ -3,6 +3,15 @@
   font-family: var(--app-font-heading);
   font-weight: 500;
   color: var(--ion-color-medium-shade);
+
+  p {
+    margin: 0 0 8px;
+  }
+
+  ion-progress-bar {
+    height: 6px;
+    border-radius: 3px;
+  }
 }
 
 .aisle {
@@ -10,35 +19,44 @@
   font-family: var(--app-font-heading);
   letter-spacing: 0.02em;
   color: var(--ion-color-primary-shade);
-  gap: 8px;
 
   &.overdue {
-    color: var(--ion-color-danger);
+    color: var(--app-danger-ink);
   }
 
   .count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
     margin-inline-start: 8px;
-    font-size: 0.8em;
-    font-weight: 500;
-    opacity: 0.7;
-  }
-}
-
-.due {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-inline-end: 12px;
-
-  &.late {
-    color: var(--ion-color-danger) !important;
+    border-radius: 10px;
+    background: var(--app-primary-soft);
+    font-size: 0.75rem;
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.overdue .count {
+    background: var(--app-danger-soft);
   }
 }
 
-.flag {
-  color: var(--ion-color-danger);
-  vertical-align: -2px;
+// Shopping lists wear the amber "food" accent; task lists keep the brand green.
+.shopping .aisle {
+  color: var(--app-accent-ink);
+
+  .count {
+    background: var(--app-accent-soft);
+  }
+}
+
+.kind {
+  vertical-align: -3px;
+  margin-inline-end: 6px;
+  opacity: 0.85;
 }
 
 ion-item {
@@ -65,15 +83,52 @@ ion-label {
   }
 }
 
-.reminder {
+.flag {
+  color: var(--app-danger-ink);
+  vertical-align: -2px;
+  margin-inline-end: 4px;
+}
+
+// Deadline and reminder chips: colour plus icon plus words, never colour alone.
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px !important;
+}
+
+.chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--app-accent-ink) !important;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ion-color-light);
+  color: var(--ion-color-medium-shade) !important;
+  font-size: 0.8rem;
+  line-height: 1.5;
+
+  &.today,
+  &.reminder {
+    background: var(--app-accent-soft);
+    color: var(--app-accent-ink) !important;
+  }
+
+  &.late {
+    background: var(--app-danger-soft);
+    color: var(--app-danger-ink) !important;
+    font-weight: 600;
+  }
 }
 
 ion-list:last-of-type {
   margin-bottom: 96px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .chip {
+    background: var(--ion-border-color);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

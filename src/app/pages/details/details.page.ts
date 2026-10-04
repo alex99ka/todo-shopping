@@ -28,13 +28,23 @@ import {
   IonLabel,
   IonList,
   IonListHeader,
+  IonProgressBar,
   IonThumbnail,
   IonTitle,
   IonToolbar,
   ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { add, alarm, calendar, ellipsisVertical, flag, trash } from 'ionicons/icons';
+import {
+  add,
+  alarm,
+  basket,
+  calendar,
+  checkboxOutline,
+  ellipsisVertical,
+  flag,
+  trash,
+} from 'ionicons/icons';
 import { firstValueFrom, of, shareReplay, switchMap } from 'rxjs';
 import {
   AuthService,
@@ -69,6 +79,7 @@ import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
     IonLabel,
     IonList,
     IonListHeader,
+    IonProgressBar,
     IonThumbnail,
     IonTitle,
     IonToolbar,
@@ -107,6 +118,10 @@ export class DetailsPage {
   });
 
   protected readonly remaining = computed(() => this.items().filter((i) => !i.state).length);
+  protected readonly progress = computed(() => {
+    const total = this.items().length;
+    return total ? (total - this.remaining()) / total : 0;
+  });
 
   // Shopping: what is still to buy in aisle order, then everything already in
   // the basket. Tasks: by deadline (overdue, today, later, none), then done.
@@ -144,7 +159,7 @@ export class DetailsPage {
   private destroyed = false;
 
   constructor() {
-    addIcons({ add, alarm, calendar, ellipsisVertical, flag, trash });
+    addIcons({ add, alarm, basket, calendar, checkboxOutline, ellipsisVertical, flag, trash });
     effect(() => {
       const wanted = this.photoPaths(this.items());
       untracked(() => this.syncPhotos(wanted));
@@ -181,8 +196,12 @@ export class DetailsPage {
     this.removeItem(item).catch(() => this.alert.presentToast('משהו השתבש'));
   }
 
-  protected overdue(item: Item): boolean {
-    return !item.state && !!item.dueAt && item.dueAt < startOfDay(Date.now());
+  /** Drives the deadline chip's colour; the chip's text says the same in words. */
+  protected dueTone(item: Item): 'late' | 'today' | '' {
+    const today = startOfDay(Date.now());
+    if (!item.dueAt || item.state) return '';
+    if (item.dueAt < today) return 'late';
+    return item.dueAt < today + DAY ? 'today' : '';
   }
 
   protected dueText(item: Item): string {
@@ -193,11 +212,12 @@ export class DetailsPage {
     if (days === 0) return 'היום';
     if (days === 1) return 'מחר';
     if (days === -1) return 'אתמול';
-    return new Date(item.dueAt).toLocaleDateString('he-IL', {
+    const date = new Date(item.dueAt).toLocaleDateString('he-IL', {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
     });
+    return days < 0 ? `באיחור · ${date}` : date;
   }
 
   protected reminderText(item: Item): string {
@@ -224,11 +244,17 @@ export class DetailsPage {
       header: list.name,
       buttons: [
         { text: 'הזמנת אנשים לרשימה', data: 'invite' },
-        ...(owner ? [{ text: 'העברה למשק בית…', data: 'move' }] : []),
+        ...(owner
+          ? [
+              { text: 'שינוי שם', data: 'rename' },
+              { text: 'העברה למשק בית…', data: 'move' },
+            ]
+          : []),
         ...(done.length ? [{ text: `ניקוי ${done.length} שסומנו`, data: 'clear' }] : []),
         ...(!owner && list.memberUids.includes(this.uid ?? '')
           ? [{ text: 'עזיבת הרשימה', role: 'destructive', data: 'leave' }]
           : []),
+        ...(owner ? [{ text: 'מחיקת הרשימה', role: 'destructive', data: 'delete' }] : []),
         { text: 'ביטול', role: 'cancel' },
       ],
     });
@@ -237,6 +263,10 @@ export class DetailsPage {
     try {
       if (data === 'invite') {
         await this.invites.share('list', list.id, list.name);
+      } else if (data === 'rename') {
+        this.renameList(list);
+      } else if (data === 'delete') {
+        this.deleteList(list);
       } else if (data === 'move') {
         await this.moveToHousehold(list);
       } else if (data === 'clear') {
@@ -249,6 +279,32 @@ export class DetailsPage {
     } catch {
       await this.alert.presentToast('משהו השתבש');
     }
+  }
+
+  // Swiping a list on the home screen does the same; these are the non-swipe way.
+  private renameList(list: TodoList): void {
+    void this.alert.createAlert({
+      title: 'שינוי שם',
+      inputs: [{ name: 'name', value: list.name }],
+      yesText: 'שמירה',
+      yesToastThen: 'השם שונה',
+      yesToastCatch: 'משהו השתבש',
+      yesFunction: (data) =>
+        this.todoListService.renameList(list.id, (data?.['name'] ?? '').trim() || list.name),
+    });
+  }
+
+  private deleteList(list: TodoList): void {
+    void this.alert.createAlert({
+      title: 'למחוק את הרשימה?',
+      message: `"${list.name}" וכל מה שבה יימחקו אצל כולם.`,
+      yesText: 'מחיקה',
+      yesToastCatch: 'משהו השתבש',
+      yesFunction: async () => {
+        void this.todoListService.deleteList(list.id).catch(() => undefined);
+        await this.router.navigateByUrl('/home', { replaceUrl: true });
+      },
+    });
   }
 
   private async moveToHousehold(list: TodoList): Promise<void> {

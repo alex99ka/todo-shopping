@@ -63,3 +63,8 @@ ion-item-option {
     margin-inline: auto !important;
   }
 }
+
+// Material action sheets don't colour destructive buttons; make them read as such.
+.action-sheet-destructive {
+  color: var(--ion-color-danger) !important;
+}

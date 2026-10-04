@@ -48,7 +48,6 @@
             ],
             "styles": [
               "node_modules/@fontsource-variable/rubik/index.css",
-              "node_modules/@fontsource-variable/nunito-sans/index.css",
               "node_modules/@ionic/angular/css/core.css",
               "node_modules/@ionic/angular/css/normalize.css",
               "node_modules/@ionic/angular/css/structure.css",

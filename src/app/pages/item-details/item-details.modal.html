@@ -93,15 +93,22 @@
     </ion-checkbox>
   </ion-item>
 
+  @if (item) {
+    <ion-button class="delete" fill="clear" color="danger" expand="block" (click)="remove()">
+      <ion-icon slot="start" name="trash" aria-hidden="true"></ion-icon>
+      {{ shopping ? 'מחיקת הפריט' : 'מחיקת המשימה' }}
+    </ion-button>
+  }
+
   <ion-row class="ion-padding-top">
     <ion-col>
       <ion-button fill="outline" color="medium" expand="block" (click)="dismiss(false)">ביטול</ion-button>
     </ion-col>
     <ion-col>
       @if (item) {
-        <ion-button expand="block" [disabled]="!name().trim()" (click)="updateItem()">שמירה</ion-button>
+        <ion-button expand="block" [color]="shopping ? 'tertiary' : 'primary'" [disabled]="!name().trim()" (click)="updateItem()">שמירה</ion-button>
       } @else {
-        <ion-button expand="block" [disabled]="!name().trim()" (click)="addItem()">הוספה</ion-button>
+        <ion-button expand="block" [color]="shopping ? 'tertiary' : 'primary'" [disabled]="!name().trim()" (click)="addItem()">הוספה</ion-button>
       }
     </ion-col>
   </ion-row>
