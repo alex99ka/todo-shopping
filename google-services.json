@@ -1,33 +1,41 @@
 {
   "project_info": {
-    "project_number": "176601468063",
-    "project_id": "todo-list-f5305",
-    "storage_bucket": "todo-list-f5305.firebasestorage.app"
+    "project_number": "835092070723",
+    "project_id": "alex-todo-shopping",
+    "storage_bucket": "alex-todo-shopping.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:176601468063:android:19c76449205e60d1bde6aa",
+        "mobilesdk_app_id": "1:835092070723:android:f70cc2d947288566ad6ff6",
         "android_client_info": {
-          "package_name": "com.todo.list"
+          "package_name": "com.alex99ka.todoshop"
         }
       },
       "oauth_client": [
         {
-          "client_id": "176601468063-bq9pk3g7gs7991j8i16b38pt837v160r.apps.googleusercontent.com",
+          "client_id": "835092070723-1clj56roc131qcr14vpe13hfoca2shq7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.alex99ka.todoshop",
+            "certificate_hash": "38483ee50715156871e3b1d8abcbd3d8399fea4c"
+          }
+        },
+        {
+          "client_id": "835092070723-frilc5sdv397qeh010vft7c6fvham4uo.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCQQ3nD2CExN1IQlLPvulbR1UjeCQV49eU"
+          "current_key": "AIzaSyCSyYbnHqekB4ld3nmCY0NGxkSDsRe6rYI"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "176601468063-bq9pk3g7gs7991j8i16b38pt837v160r.apps.googleusercontent.com",
+              "client_id": "835092070723-frilc5sdv397qeh010vft7c6fvham4uo.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
