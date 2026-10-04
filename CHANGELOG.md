@@ -9,6 +9,14 @@ versions reach installed apps as an in-app update.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-10-04
+
+### Fixed
+
+- The 1.1.1 sign-in fix now also reaches browsers that had the site open before: each
+  release changes the service worker file, so browsers reinstall it with the current
+  security policy.
+
 ## [1.1.1] - 2026-10-04
 
 ### Fixed
@@ -83,7 +91,8 @@ First release of Todo and Shopping, forked from
 - The non-working username/password and Facebook sign-in buttons (Google only).
 - The upstream site's Google Analytics snippet and the third-party avatar service.
 
-[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.1.1...HEAD
+[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.1.2...HEAD
+[1.1.2]: https://github.com/alex99ka/todo-shopping/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/alex99ka/todo-shopping/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/alex99ka/todo-shopping/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/alex99ka/todo-shopping/releases/tag/1.0.0
