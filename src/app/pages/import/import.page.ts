@@ -17,7 +17,7 @@ import {
 } from '@ionic/angular';
 import { filter, firstValueFrom } from 'rxjs';
 import { HouseholdService, TodoListService } from '../../core';
-import { CATEGORIES, SHOPPING_LIST, TodoList } from '../../models';
+import { CATEGORIES, CATEGORY_LABELS, SHOPPING_LIST, TodoList, isShopping } from '../../models';
 
 interface Incoming {
   name: string;
@@ -60,24 +60,24 @@ interface Incoming {
     <ion-header>
       <ion-toolbar color="primary">
         <ion-buttons slot="start">
-          <ion-button (click)="home()">Cancel</ion-button>
+          <ion-button (click)="home()">ביטול</ion-button>
         </ion-buttons>
-        <ion-title>Add to shopping list</ion-title>
+        <ion-title>הוספה לרשימת הקניות</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content>
       @if (error()) {
         <div class="ion-padding ion-text-center">
           <ion-text color="danger"><p>{{ error() }}</p></ion-text>
-          <ion-button fill="clear" (click)="home()">Go to my lists</ion-button>
+          <ion-button fill="clear" (click)="home()">לרשימות שלי</ion-button>
         </div>
       } @else {
         <div class="recipe">
-          <ion-note>From the recipe</ion-note>
-          <h2 dir="auto">{{ recipe || 'Recipe' }}</h2>
+          <ion-note>מהמתכון</ion-note>
+          <h2 dir="auto">{{ recipe || 'מתכון' }}</h2>
         </div>
         @for (group of groups(); track group.category) {
-          <ion-list-header>{{ group.category }}</ion-list-header>
+          <ion-list-header>{{ labels[group.category] }}</ion-list-header>
           <ion-list inset>
             @for (item of group.items; track $index) {
               <ion-item>
@@ -94,7 +94,7 @@ interface Incoming {
     @if (!error()) {
       <ion-footer class="ion-padding">
         <ion-button expand="block" [disabled]="busy()" (click)="run()">
-          {{ busy() ? 'Adding…' : 'Add ' + items.length + ' items' }}
+          {{ busy() ? 'מוסיף…' : 'הוספת ' + items.length + ' פריטים' }}
         </ion-button>
       </ion-footer>
     }
@@ -107,6 +107,7 @@ export class ImportPage {
 
   protected readonly error = signal('');
   protected readonly busy = signal(false);
+  protected readonly labels = CATEGORY_LABELS;
   protected recipe = '';
   protected items: Incoming[] = [];
   protected readonly groups = computed(() =>
@@ -131,11 +132,11 @@ export class ImportPage {
         }))
         .filter((i: Incoming) => i.name);
     } catch {
-      this.fail('That link has no ingredients in it.');
+      this.fail('אין מצרכים בקישור הזה.');
       return;
     }
     if (!this.items.length) {
-      this.fail('That link has no ingredients in it.');
+      this.fail('אין מצרכים בקישור הזה.');
     }
   }
 
@@ -159,38 +160,40 @@ export class ImportPage {
         const same = existing.find(
           (e) => !e.state && e.name.trim().toLowerCase() === item.name.toLowerCase(),
         );
+        // Writes are not awaited: offline they resolve only once synced, and the
+        // local cache already shows them on the list.
         if (same) {
           const { name, state, date } = same;
           const description = [same.description, note(item)].filter(Boolean).join('; ');
-          await this.lists.updateItem(listId, same.id, { name, state, date, description });
+          void this.lists.updateItem(listId, same.id, { name, state, date, description }).catch(() => undefined);
         } else {
-          await this.lists.createItem(listId, this.lists.newItemId(listId), {
+          void this.lists.createItem(listId, this.lists.newItemId(listId), {
             name: item.name,
             description: note(item),
             category: item.category,
             state: false,
             date: Date.now(),
             listCreatedAt: list.createdAt,
-          });
+          }).catch(() => undefined);
         }
       }
       await this.router.navigateByUrl(`/details/${listId}`, { replaceUrl: true });
     } catch {
       this.busy.set(false);
-      this.fail('Could not add the ingredients. Try again.');
+      this.fail('לא הצלחנו להוסיף את המצרכים. נסו שוב.');
     }
   }
 
   // The household's Shopping list if there is one (that is the one everybody
   // shops from), else your own; created in your first household when missing.
   private async shoppingListId(): Promise<string> {
-    const all = (await firstValueFrom(this.lists.lists$())).filter((l) => l.name === SHOPPING_LIST);
+    const all = (await firstValueFrom(this.lists.lists$())).filter(isShopping);
     const found = all.find((l) => l.householdId) ?? all[0];
     if (found) {
       return found.id;
     }
     const [household] = await firstValueFrom(this.households.households$());
-    return this.lists.createList(SHOPPING_LIST, household ?? null);
+    return this.lists.createList(SHOPPING_LIST, 'shopping', household ?? null);
   }
 
   private fail(message: string): void {

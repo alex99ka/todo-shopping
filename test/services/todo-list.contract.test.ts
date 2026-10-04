@@ -29,6 +29,7 @@ test('the TodoListService payloads and queries are allowed end to end', async ()
     const created = await addDoc(collection(db, 'lists'), {
       ownerUid: OWNER,
       name: 'Groceries',
+      kind: 'shopping',
       date: Date.now(),
       createdAt: serverTimestamp(),
       memberUids: [OWNER],

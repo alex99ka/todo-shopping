@@ -1,9 +1,9 @@
-<app-nav-bar title="My lists" (clickSearch)="toggleSearchBar()"></app-nav-bar>
+<app-nav-bar title="הרשימות שלי" (clickSearch)="toggleSearchBar()"></app-nav-bar>
 
 <ion-content>
   @if (!searchBarHidden()) {
     <ion-searchbar
-      placeholder="Search lists"
+      placeholder="חיפוש רשימה"
       [ngModel]="search()"
       (ngModelChange)="search.set($event)"
     ></ion-searchbar>
@@ -20,35 +20,31 @@
           <ion-item-sliding>
             <ion-item button detail (click)="goToDetails(todoList)">
               <span class="monogram" [class.shopping]="isShopping(todoList)" slot="start" aria-hidden="true">
-                @if (isShopping(todoList)) {
-                  <ion-icon name="basket"></ion-icon>
-                } @else {
-                  {{ todoList.name.charAt(0).toUpperCase() }}
-                }
+                <ion-icon [name]="isShopping(todoList) ? 'basket' : 'checkbox-outline'"></ion-icon>
               </span>
               <ion-label>
                 <h2>{{ todoList.name }}</h2>
-                <p>Created {{ todoList.date | dateCreated }}</p>
+                <p>{{ isShopping(todoList) ? 'קניות' : 'משימות' }} · נוצרה {{ todoList.date | dateCreated }}</p>
               </ion-label>
             </ion-item>
             <ion-item-options side="end">
               <ion-item-option color="primary" (click)="invite(todoList)">
                 <ion-icon slot="top" name="person-add" aria-hidden="true"></ion-icon>
-                Invite
+                הזמנה
               </ion-item-option>
               @if (todoList.ownerUid === uid) {
                 <ion-item-option color="medium" (click)="renameList(todoList)">
                   <ion-icon slot="top" name="create" aria-hidden="true"></ion-icon>
-                  Rename
+                  שינוי שם
                 </ion-item-option>
                 <ion-item-option color="danger" (click)="deleteList(todoList)">
                   <ion-icon slot="top" name="trash" aria-hidden="true"></ion-icon>
-                  Delete
+                  מחיקה
                 </ion-item-option>
               } @else {
                 <ion-item-option color="danger" (click)="leaveList(todoList)">
                   <ion-icon slot="top" name="exit" aria-hidden="true"></ion-icon>
-                  Leave
+                  עזיבה
                 </ion-item-option>
               }
             </ion-item-options>
@@ -57,24 +53,24 @@
       </ion-list>
     } @empty {
       @if (all.length) {
-        <app-empty-list icon="list-circle" h1Text="No matches" [h3Text]="'Nothing called “' + search() + '”.'" />
+        <app-empty-list icon="list-circle" h1Text="לא נמצא" [h3Text]="'אין רשימה בשם “' + search() + '”.'" />
       } @else {
         <app-empty-list
           icon="list-circle"
-          h1Text="No lists yet"
-          h3Text="Tap + to start one. Name it “Shopping” for grocery aisles."
+          h1Text="אין עדיין רשימות"
+          h3Text="לחצו + ליצירת רשימת קניות או רשימת משימות."
         />
       }
     }
     @if (sections().length) {
-      <p class="hint"><ion-note>Swipe a list left to invite people, rename or delete it.</ion-note></p>
+      <p class="hint"><ion-note>החליקו רשימה הצידה כדי להזמין, לשנות שם או למחוק.</ion-note></p>
     }
   } @else {
     <ion-spinner></ion-spinner>
   }
 
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button aria-label="New list" (click)="addList()">
+    <ion-fab-button aria-label="רשימה חדשה" (click)="addList()">
       <ion-icon name="add" aria-hidden="true"></ion-icon>
     </ion-fab-button>
   </ion-fab>

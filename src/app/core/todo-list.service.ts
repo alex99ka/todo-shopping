@@ -1,6 +1,5 @@
 import { Injectable, inject } from '@angular/core';
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -12,8 +11,8 @@ import {
   where,
 } from 'firebase/firestore';
 import { collectionData, docData } from 'rxfire/firestore';
-import { Observable, catchError, combineLatest, map, of, switchMap } from 'rxjs';
-import { Household, Item, ItemChanges, TodoList } from '../models';
+import { Observable, catchError, combineLatest, map, of, retry, switchMap } from 'rxjs';
+import { Household, Item, ItemChanges, ListKind, TodoList } from '../models';
 import { AuthService } from './auth.service';
 import { HouseholdService, leave } from './household.service';
 import { FIRESTORE } from './firebase.providers';
@@ -67,6 +66,10 @@ export class TodoListService {
   list$(listId: string): Observable<TodoList | null> {
     return docData(doc(this.db, 'lists', listId), { idField: 'id' }).pipe(
       map((list) => (list ? (list as TodoList) : null)),
+      // Denied: a list created offline that the server has not got yet (retry), or
+      // one deleted or left meanwhile (give up and show nothing).
+      retry({ count: 3, delay: 2000 }),
+      catchError(() => of(null)),
     );
   }
 
@@ -81,14 +84,16 @@ export class TodoListService {
     ) as Observable<Item[]>;
   }
 
-  async createList(name: string, household: Household | null = null): Promise<string> {
+  async createList(name: string, kind: ListKind, household: Household | null = null): Promise<string> {
     const uid = this.auth.uid;
     if (!uid) {
       throw new Error('No signed-in user');
     }
-    const created = await addDoc(collection(this.db, 'lists'), {
+    const created = doc(collection(this.db, 'lists'));
+    const write = setDoc(created, {
       ownerUid: uid,
       name,
+      kind,
       date: Date.now(),
       createdAt: serverTimestamp(),
       memberUids: [uid],
@@ -96,6 +101,15 @@ export class TodoListService {
       householdId: household?.id ?? null,
       householdCreatedAt: household?.createdAt ?? null,
     });
+    // Online, wait for the server: opening the list before it exists there gets the
+    // read denied. Offline, a write only resolves once synced, and the local cache
+    // already has the list.
+    // ponytail: navigator.onLine is true on a connected-but-dead network; then this waits until it recovers.
+    if (navigator.onLine) {
+      await write;
+    } else {
+      write.catch(() => undefined);
+    }
     return created.id;
   }
 

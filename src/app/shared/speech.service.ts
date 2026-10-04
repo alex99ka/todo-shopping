@@ -15,7 +15,7 @@ export class SpeechService {
   /** Resolves with the best match, or an empty string if nothing was heard. */
   async listen(): Promise<string> {
     const { matches } = await SpeechRecognition.start({
-      language: 'fr-FR',
+      language: 'he-IL',
       maxResults: 1,
       partialResults: false,
       popup: false,

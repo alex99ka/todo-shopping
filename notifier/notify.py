@@ -70,7 +70,7 @@ def same_epoch(item, lst):
 def display_name(user):
     # users/{uid} is written by its owner with no size limit; an oversized body
     # makes FCM answer INVALID_ARGUMENT, which would read as a dead token.
-    return str((user or {}).get('displayName') or 'Someone')[:60]
+    return str((user or {}).get('displayName') or 'מישהו')[:60]
 
 
 def group_new_items(items):
@@ -93,7 +93,7 @@ def unseen(found, seen, floor):
 
 
 def added_text(who, names):
-    return f'{who} added "{names[0]}"' if len(names) == 1 else f'{who} added {len(names)} items'
+    return f'"{names[0]}" נוסף ע״י {who}' if len(names) == 1 else f'{len(names)} פריטים נוספו ע״י {who}'
 
 
 def build_message(token, title, body, path):
@@ -158,7 +158,7 @@ def new_items(db, st):
             continue
         user = db.collection('users').document(by).get().to_dict() if by else None
         names = [i.get('name') or '' for i in group]
-        send(tokens_of(db, uids), lst.get('name') or 'List', added_text(display_name(user), names),
+        send(tokens_of(db, uids), lst.get('name') or 'רשימה', added_text(display_name(user), names),
              f'/details/{list_id}')
 
 
@@ -174,7 +174,7 @@ def reminders(db, st):
             list_id = s.reference.parent.parent.id
             lst, uids = members(db, list_id)
             if same_epoch(item, lst):
-                send(tokens_of(db, uids), 'Reminder', item.get('name') or '', f'/details/{list_id}')
+                send(tokens_of(db, uids), 'תזכורת', item.get('name') or '', f'/details/{list_id}')
         s.reference.update({'reminded': True})
 
 
@@ -207,8 +207,8 @@ def release(db, st):
         return
     if stored is not None:
         version = tag.lstrip('v')
-        send(list(db.collection_group('tokens').stream()), 'Update available',
-             f'Version {version} is ready — open the app to update', '/settings')
+        send(list(db.collection_group('tokens').stream()), 'עדכון זמין',
+             f'גרסה {version} מוכנה — פתחו את האפליקציה כדי לעדכן', '/settings')
     ref.set({'lastRelease': tag}, merge=True)
     log.info('release %s stored (was %s)', tag, stored)
 
@@ -238,7 +238,7 @@ def selftest():
     assert not same_epoch({'listCreatedAt': 'T0'}, {'createdAt': 'T1'})
     assert not same_epoch({'listCreatedAt': 'T0'}, None)
     assert display_name({'displayName': 'x' * 5000}) == 'x' * 60
-    assert display_name(None) == 'Someone'
+    assert display_name(None) == 'מישהו'
 
     milk, eggs, bread, tea = ({'name': n, 'by': b} for n, b in
                               (('Milk', 'u1'), ('Eggs', 'u1'), ('Bread', 'u1'), ('Tea', 'u2')))
@@ -253,8 +253,8 @@ def selftest():
     again = unseen([('i1', 'L1', {'date': 100}), ('i3', 'L1', {'date': 90})], seen, floor=60)
     assert [i['date'] for _, i in again] == [90] and seen == {'i1': 100, 'i3': 90}
 
-    assert added_text('Alex', ['Milk']) == 'Alex added "Milk"'
-    assert added_text('Alex', ['x'] * 12) == 'Alex added 12 items'
+    assert added_text('Alex', ['Milk']) == '"Milk" נוסף ע״י Alex'
+    assert added_text('Alex', ['x'] * 12) == '12 פריטים נוספו ע״י Alex'
 
     m = build_message('tok', 'Groceries', 'Alex added "Milk"', '/details/L1')
     assert (m.token, m.data, m.notification.title) == ('tok', {'path': '/details/L1'}, 'Groceries')

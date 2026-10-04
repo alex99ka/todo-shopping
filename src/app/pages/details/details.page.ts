@@ -34,7 +34,7 @@ import {
   ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { add, alarm, ellipsisVertical, trash } from 'ionicons/icons';
+import { add, alarm, calendar, ellipsisVertical, flag, trash } from 'ionicons/icons';
 import { firstValueFrom, of, shareReplay, switchMap } from 'rxjs';
 import {
   AuthService,
@@ -43,7 +43,7 @@ import {
   PhotoService,
   TodoListService,
 } from '../../core';
-import { CATEGORIES, Household, Item, SHOPPING_LIST, TodoList } from '../../models';
+import { CATEGORIES, CATEGORY_LABELS, Household, Item, TodoList, isShopping } from '../../models';
 import { AlertService, EmptyListComponent } from '../../shared';
 import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
 
@@ -69,7 +69,7 @@ import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
     IonLabel,
     IonList,
     IonListHeader,
-      IonThumbnail,
+    IonThumbnail,
     IonTitle,
     IonToolbar,
     EmptyListComponent,
@@ -101,36 +101,42 @@ export class DetailsPage {
     { initialValue: [] },
   );
 
-  protected readonly shopping = computed(() => this.todoList()?.name === SHOPPING_LIST);
+  protected readonly shopping = computed(() => {
+    const list = this.todoList();
+    return !!list && isShopping(list);
+  });
 
   protected readonly remaining = computed(() => this.items().filter((i) => !i.state).length);
 
-  // The shopping list reads in aisle order with what is still to buy on top;
-  // any other list is one run, open tasks first, oldest first.
+  // Shopping: what is still to buy in aisle order, then everything already in
+  // the basket. Tasks: by deadline (overdue, today, later, none), then done.
   protected readonly groups = computed(() => {
     const items = this.items();
-    if (!this.shopping()) {
-      const sorted = [...items].sort((a, b) => Number(a.state) - Number(b.state) || a.date - b.date);
-      return sorted.length ? [{ category: '', items: sorted }] : [];
-    }
-    const order = (c?: string) => {
-      const i = CATEGORIES.indexOf((c ?? 'Other') as (typeof CATEGORIES)[number]);
-      return i < 0 ? CATEGORIES.length : i;
-    };
-    const sorted = [...items].sort(
-      (a, b) => order(a.category) - order(b.category) || Number(a.state) - Number(b.state),
-    );
-    const groups: { category: string; items: Item[] }[] = [];
-    for (const item of sorted) {
-      const category = item.category ?? 'Other';
-      const last = groups.at(-1);
-      if (last?.category === category) {
-        last.items.push(item);
-      } else {
-        groups.push({ category, items: [item] });
+    const open = items.filter((i) => !i.state);
+    const done = items.filter((i) => i.state);
+    const groups: { key: string; title: string; items: Item[] }[] = [];
+    if (this.shopping()) {
+      const aisle = (i: Item) =>
+        (CATEGORIES as readonly string[]).includes(i.category ?? '') ? i.category : 'Other';
+      for (const category of CATEGORIES) {
+        const inAisle = open.filter((i) => aisle(i) === category);
+        groups.push({ key: category, title: CATEGORY_LABELS[category], items: byName(inAisle) });
       }
+      groups.push({ key: 'done', title: 'בסל', items: byName(done) });
+    } else {
+      const today = startOfDay(Date.now());
+      const tomorrow = today + DAY;
+      const due = (i: Item) => i.dueAt ?? Infinity;
+      const sorted = [...open].sort((a, b) => due(a) - due(b) || rank(a) - rank(b) || a.date - b.date);
+      groups.push(
+        { key: 'overdue', title: 'באיחור', items: sorted.filter((i) => due(i) < today) },
+        { key: 'today', title: 'היום', items: sorted.filter((i) => due(i) >= today && due(i) < tomorrow) },
+        { key: 'later', title: 'בהמשך', items: sorted.filter((i) => i.dueAt && due(i) >= tomorrow) },
+        { key: 'none', title: 'ללא תאריך יעד', items: sorted.filter((i) => !i.dueAt) },
+        { key: 'done', title: 'בוצעו', items: [...done].sort((a, b) => b.date - a.date) },
+      );
     }
-    return groups;
+    return groups.filter((g) => g.items.length);
   });
 
   private readonly photoUrls = signal<Record<string, string>>({});
@@ -138,7 +144,7 @@ export class DetailsPage {
   private destroyed = false;
 
   constructor() {
-    addIcons({ add, alarm, ellipsisVertical, trash });
+    addIcons({ add, alarm, calendar, ellipsisVertical, flag, trash });
     effect(() => {
       const wanted = this.photoPaths(this.items());
       untracked(() => this.syncPhotos(wanted));
@@ -172,14 +178,33 @@ export class DetailsPage {
   }
 
   protected deleteItem(item: Item): void {
-    this.removeItem(item).catch(() => this.alert.presentToast('Something wrong happened'));
+    this.removeItem(item).catch(() => this.alert.presentToast('משהו השתבש'));
+  }
+
+  protected overdue(item: Item): boolean {
+    return !item.state && !!item.dueAt && item.dueAt < startOfDay(Date.now());
+  }
+
+  protected dueText(item: Item): string {
+    if (!item.dueAt || item.state) {
+      return '';
+    }
+    const days = Math.round((startOfDay(item.dueAt) - startOfDay(Date.now())) / DAY);
+    if (days === 0) return 'היום';
+    if (days === 1) return 'מחר';
+    if (days === -1) return 'אתמול';
+    return new Date(item.dueAt).toLocaleDateString('he-IL', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
   }
 
   protected reminderText(item: Item): string {
     if (!item.remindAt || item.state) {
       return '';
     }
-    return new Date(item.remindAt).toLocaleString(undefined, {
+    return new Date(item.remindAt).toLocaleString('he-IL', {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -198,13 +223,13 @@ export class DetailsPage {
     const sheet = await this.actionSheet.create({
       header: list.name,
       buttons: [
-        { text: 'Invite people to this list', data: 'invite' },
-        ...(owner ? [{ text: 'Move to household…', data: 'move' }] : []),
-        ...(done.length ? [{ text: `Clear ${done.length} checked`, data: 'clear' }] : []),
+        { text: 'הזמנת אנשים לרשימה', data: 'invite' },
+        ...(owner ? [{ text: 'העברה למשק בית…', data: 'move' }] : []),
+        ...(done.length ? [{ text: `ניקוי ${done.length} שסומנו`, data: 'clear' }] : []),
         ...(!owner && list.memberUids.includes(this.uid ?? '')
-          ? [{ text: 'Leave list', role: 'destructive', data: 'leave' }]
+          ? [{ text: 'עזיבת הרשימה', role: 'destructive', data: 'leave' }]
           : []),
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'ביטול', role: 'cancel' },
       ],
     });
     await sheet.present();
@@ -215,31 +240,32 @@ export class DetailsPage {
       } else if (data === 'move') {
         await this.moveToHousehold(list);
       } else if (data === 'clear') {
-        await Promise.all(done.map((i) => this.removeItem(i)));
+        // Not awaited, so it also works offline: the local cache drops them at once.
+        done.forEach((i) => this.deleteItem(i));
       } else if (data === 'leave') {
         await this.todoListService.leaveList(list.id);
         await this.router.navigateByUrl('/home', { replaceUrl: true });
       }
     } catch {
-      await this.alert.presentToast('Something wrong happened');
+      await this.alert.presentToast('משהו השתבש');
     }
   }
 
   private async moveToHousehold(list: TodoList): Promise<void> {
     const households = await firstValueFrom(this.households.households$());
     const sheet = await this.actionSheet.create({
-      header: 'Who should see this list?',
+      header: 'מי יראה את הרשימה?',
       buttons: [
-        ...households.map((h) => ({ text: `Household: ${h.name}`, data: h })),
-        { text: 'Only me and invited people', data: null },
-        { text: 'Cancel', role: 'cancel' },
+        ...households.map((h) => ({ text: `משק הבית: ${h.name}`, data: h })),
+        { text: 'רק אני ומי שהוזמן', data: null },
+        { text: 'ביטול', role: 'cancel' },
       ],
     });
     await sheet.present();
     const { data, role } = await sheet.onDidDismiss<Household | null>();
     if (role !== 'cancel' && role !== 'backdrop' && (data?.id ?? null) !== (list.householdId ?? null)) {
       await this.todoListService.setHousehold(list.id, data ?? null);
-      await this.alert.presentToast('List moved');
+      await this.alert.presentToast('הרשימה הועברה');
     }
   }
 
@@ -305,4 +331,21 @@ export class DetailsPage {
     await modal.present();
     await modal.onDidDismiss();
   }
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+const PRIORITY_RANK = { high: 0, normal: 1, low: 2 };
+
+function rank(item: Item): number {
+  return PRIORITY_RANK[item.priority ?? 'normal'];
+}
+
+function startOfDay(ms: number): number {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function byName(items: Item[]): Item[] {
+  return [...items].sort((a, b) => a.name.localeCompare(b.name, 'he'));
 }

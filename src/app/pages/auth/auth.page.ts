@@ -28,7 +28,7 @@ export class AuthPage {
     const signIn = this.auth.signInGoogle();
     signIn.catch(() => undefined);
 
-    const loading = await this.loadingCtrl.create({ message: 'Please wait...' });
+    const loading = await this.loadingCtrl.create({ message: 'רק רגע…' });
     await loading.present();
     try {
       await signIn;

@@ -46,6 +46,7 @@ export class UpdateService {
   private readonly native = Capacitor.isNativePlatform();
   private lastCheck = 0;
   private pendingBundle = '';
+  private pendingVersion = '';
 
   readonly version = version;
   readonly status = signal<UpdateStatus>('idle');
@@ -60,7 +61,7 @@ export class UpdateService {
       this.sw.versionUpdates.subscribe((event) => {
         if (event.type === 'VERSION_READY') {
           this.status.set('ready');
-          void this.prompt('A new version is ready.');
+          void this.prompt('גרסה חדשה מוכנה.');
         }
       });
     } else {
@@ -95,7 +96,7 @@ export class UpdateService {
     } catch {
       this.status.set('error');
       if (manual) {
-        await this.toast('Could not check for updates. Are you online?');
+        await this.toast('לא הצלחנו לבדוק עדכונים. יש חיבור לאינטרנט?');
       }
     }
   }
@@ -127,11 +128,16 @@ export class UpdateService {
       this.status.set('up-to-date');
       return;
     }
+    if (this.pendingBundle && this.pendingVersion === latest) {
+      // Already downloaded; it applies the next time the app goes to the background.
+      this.status.set('ready');
+      return;
+    }
     const zip = release.assets.find((a) => a.name === 'www.zip');
     const sha256 = zip?.digest?.startsWith('sha256:') ? zip.digest.slice(7) : '';
     if (latest.split('.')[0] !== version.split('.')[0] || !zip || !sha256) {
       this.status.set('needs-apk');
-      await this.prompt(`Version ${latest} needs a new app install.`, 'Download');
+      await this.prompt(`גרסה ${latest} דורשת התקנה מחדש של האפליקציה.`, true);
       return;
     }
     this.status.set('downloading');
@@ -143,26 +149,27 @@ export class UpdateService {
     // Applied by itself the next time the app goes to the background.
     await CapacitorUpdater.next({ id: bundle.id });
     this.pendingBundle = bundle.id;
+    this.pendingVersion = latest;
     this.status.set('ready');
-    await this.prompt(`Version ${latest} is ready.`);
+    await this.prompt(`גרסה ${latest} מוכנה.`);
   }
 
-  private async prompt(message: string, action = 'Restart'): Promise<void> {
+  private async prompt(message: string, needsApk = false): Promise<void> {
     const toast = await this.toastCtrl.create({
       message,
       position: 'bottom',
       buttons: [
         {
-          text: action,
+          text: needsApk ? 'הורדה' : 'הפעלה מחדש',
           handler: () => {
-            if (action === 'Download') {
+            if (needsApk) {
               window.open(this.apkUrl(), '_system');
             } else {
               void this.apply();
             }
           },
         },
-        { text: 'Later', role: 'cancel' },
+        { text: 'אחר כך', role: 'cancel' },
       ],
     });
     await toast.present();

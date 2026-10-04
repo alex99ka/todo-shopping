@@ -28,7 +28,7 @@
               aria-hidden="true"
               [color]="homeLink.isActive ? 'primary' : 'medium'"
             ></ion-icon>
-            <ion-label [color]="homeLink.isActive ? 'primary' : ''">My lists</ion-label>
+            <ion-label [color]="homeLink.isActive ? 'primary' : ''">הרשימות שלי</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle>
@@ -45,7 +45,7 @@
               aria-hidden="true"
               [color]="householdsLink.isActive ? 'primary' : 'medium'"
             ></ion-icon>
-            <ion-label [color]="householdsLink.isActive ? 'primary' : ''">Households</ion-label>
+            <ion-label [color]="householdsLink.isActive ? 'primary' : ''">משקי בית</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle>
@@ -62,13 +62,13 @@
               aria-hidden="true"
               [color]="settingsLink.isActive ? 'primary' : 'medium'"
             ></ion-icon>
-            <ion-label [color]="settingsLink.isActive ? 'primary' : ''">Settings</ion-label>
+            <ion-label [color]="settingsLink.isActive ? 'primary' : ''">הגדרות</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle>
           <ion-item button lines="none" (click)="confirmSignOut()">
             <ion-icon slot="start" name="log-out" aria-hidden="true"></ion-icon>
-            <ion-label>Sign Out</ion-label>
+            <ion-label>התנתקות</ion-label>
           </ion-item>
         </ion-menu-toggle>
       </ion-content>

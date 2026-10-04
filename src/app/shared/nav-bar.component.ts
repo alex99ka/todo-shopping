@@ -28,7 +28,7 @@ import { grid, list, search } from 'ionicons/icons';
               <ion-icon slot="icon-only" [name]="cardOrList() ? 'list' : 'grid'"></ion-icon>
             </ion-button>
           }
-          <ion-button (click)="clickSearch.emit()">
+          <ion-button aria-label="חיפוש" (click)="clickSearch.emit()">
             <ion-icon slot="icon-only" name="search"></ion-icon>
           </ion-button>
         </ion-buttons>

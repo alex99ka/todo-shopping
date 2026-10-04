@@ -1,11 +1,11 @@
 <ion-header>
   <ion-toolbar color="primary">
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/home"></ion-back-button>
+      <ion-back-button defaultHref="/home" text="חזרה"></ion-back-button>
     </ion-buttons>
     <ion-title>{{ todoList()?.name }}</ion-title>
     <ion-buttons slot="end">
-      <ion-button aria-label="List options" (click)="openMenu()">
+      <ion-button aria-label="אפשרויות הרשימה" (click)="openMenu()">
         <ion-icon slot="icon-only" name="ellipsis-vertical" aria-hidden="true"></ion-icon>
       </ion-button>
     </ion-buttons>
@@ -17,16 +17,17 @@
     @if (items().length) {
       <p class="summary" aria-live="polite">
         @if (remaining()) {
-          {{ remaining() }} {{ shopping() ? 'to buy' : 'to do' }}
+          נשארו {{ remaining() }} {{ shopping() ? 'פריטים לקנות' : 'משימות' }}
         } @else {
-          All done
+          {{ shopping() ? 'הכול בסל' : 'הכול בוצע' }}
         }
       </p>
     }
-    @for (group of groups(); track group.category) {
-      @if (group.category) {
-        <ion-list-header class="aisle">{{ group.category }}</ion-list-header>
-      }
+    @for (group of groups(); track group.key) {
+      <ion-list-header class="aisle" [class.overdue]="group.key === 'overdue'">
+        {{ group.title }}
+        <span class="count">{{ group.items.length }}</span>
+      </ion-list-header>
       <ion-list inset>
         @for (item of group.items; track item.id) {
           <ion-item-sliding>
@@ -38,9 +39,19 @@
                 (ionChange)="toggleItem(item)"
               ></ion-checkbox>
               <ion-label class="ion-text-wrap" (click)="updateItem(item)">
-                <h2>{{ item.name }}</h2>
+                <h2 dir="auto">
+                  @if (!shopping() && item.priority === 'high' && !item.state) {
+                    <ion-icon class="flag" name="flag" aria-label="עדיפות גבוהה"></ion-icon>
+                  }
+                  {{ item.name }}
+                </h2>
                 @if (item.description) {
-                  <p>{{ item.description }}</p>
+                  <p dir="auto">{{ item.description }}</p>
+                }
+                @if (dueText(item); as due) {
+                  <p class="due" [class.late]="overdue(item)">
+                    <ion-icon name="calendar" aria-hidden="true"></ion-icon> {{ due }}
+                  </p>
                 }
                 @if (reminderText(item); as when) {
                   <p class="reminder"><ion-icon name="alarm" aria-hidden="true"></ion-icon> {{ when }}</p>
@@ -52,7 +63,7 @@
             </ion-item>
             <ion-item-options side="end">
               <ion-item-option color="danger" (click)="deleteItem(item)">
-                <ion-icon slot="icon-only" name="trash" aria-label="Delete"></ion-icon>
+                <ion-icon slot="icon-only" name="trash" aria-label="מחיקה"></ion-icon>
               </ion-item-option>
             </ion-item-options>
           </ion-item-sliding>
@@ -62,16 +73,16 @@
       @if (shopping()) {
         <app-empty-list
           icon="basket"
-          h1Text="Nothing to buy"
-          h3Text="Tap + to add an item, or send a recipe here from the recipe book."
+          h1Text="אין מה לקנות"
+          h3Text="לחצו + להוספת פריט, או שלחו לכאן מתכון מספר המתכונים."
         />
       } @else {
-        <app-empty-list icon="list-circle" h1Text="Nothing to do" h3Text="Tap + to add a task." />
+        <app-empty-list icon="list-circle" h1Text="אין משימות" h3Text="לחצו + להוספת משימה." />
       }
     }
   }
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button [attr.aria-label]="shopping() ? 'Add item' : 'Add task'" (click)="addItem()">
+    <ion-fab-button [attr.aria-label]="shopping() ? 'הוספת פריט' : 'הוספת משימה'" (click)="addItem()">
       <ion-icon name="add" aria-hidden="true"></ion-icon>
     </ion-fab-button>
   </ion-fab>

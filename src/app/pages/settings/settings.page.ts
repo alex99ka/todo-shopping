@@ -33,7 +33,7 @@ import { AlertService } from '../../shared';
   `,
   imports: [
     IonAvatar,
-      IonButtons,
+    IonButtons,
     IonContent,
     IonHeader,
     IonIcon,
@@ -52,7 +52,7 @@ import { AlertService } from '../../shared';
     <ion-header>
       <ion-toolbar color="primary">
         <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
-        <ion-title>Settings</ion-title>
+        <ion-title>הגדרות</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content>
@@ -70,7 +70,7 @@ import { AlertService } from '../../shared';
         </ion-list>
       }
 
-      <ion-list-header>Notifications</ion-list-header>
+      <ion-list-header>התראות</ion-list-header>
       <ion-list inset>
         <ion-item>
           <ion-icon slot="start" name="notifications" color="primary" aria-hidden="true"></ion-icon>
@@ -80,26 +80,26 @@ import { AlertService } from '../../shared';
             (ionChange)="togglePush($event)"
           >
             <ion-label>
-              Push notifications
-              <p>Task reminders, changes to shared lists, new versions</p>
+              התראות פוש
+              <p>תזכורות למשימות, פריטים שנוספו לרשימות משותפות, גרסאות חדשות</p>
             </ion-label>
           </ion-toggle>
         </ion-item>
         @if (!push.supported()) {
           <ion-item lines="none">
             <ion-note>
-              Not available in this browser. On an iPhone, add the app to the Home Screen first.
+              לא זמין בדפדפן הזה. באייפון צריך קודם להוסיף את האפליקציה למסך הבית.
             </ion-note>
           </ion-item>
         }
       </ion-list>
 
-      <ion-list-header>App</ion-list-header>
+      <ion-list-header>אפליקציה</ion-list-header>
       <ion-list inset>
         <ion-item>
           <ion-label>
-            Version
-            <p class="version">{{ updates.version }}{{ native ? ' · Android' : ' · Web' }}</p>
+            גרסה
+            <p class="version">{{ updates.version }}{{ native ? ' · אנדרואיד' : ' · אתר' }}</p>
           </ion-label>
           <ion-note slot="end">{{ statusText() }}</ion-note>
         </ion-item>
@@ -107,13 +107,13 @@ import { AlertService } from '../../shared';
           @case ('ready') {
             <ion-item button (click)="updates.apply()">
               <ion-icon slot="start" name="sparkles" color="primary" aria-hidden="true"></ion-icon>
-              <ion-label>Restart to update</ion-label>
+              <ion-label>הפעלה מחדש לעדכון</ion-label>
             </ion-item>
           }
           @case ('needs-apk') {
             <ion-item button [href]="updates.apkUrl()" target="_blank" rel="noopener">
               <ion-icon slot="start" name="download" color="primary" aria-hidden="true"></ion-icon>
-              <ion-label>Download version {{ updates.latest() }}</ion-label>
+              <ion-label>הורדת גרסה {{ updates.latest() }}</ion-label>
             </ion-item>
           }
           @default {
@@ -123,23 +123,23 @@ import { AlertService } from '../../shared';
               } @else {
                 <ion-icon slot="start" name="refresh" color="primary" aria-hidden="true"></ion-icon>
               }
-              <ion-label>Check for updates</ion-label>
+              <ion-label>בדיקת עדכונים</ion-label>
             </ion-item>
           }
         }
         @if (!native) {
           <ion-item button [href]="releasesUrl" target="_blank" rel="noopener">
             <ion-icon slot="start" name="download" color="medium" aria-hidden="true"></ion-icon>
-            <ion-label>Get the Android app</ion-label>
+            <ion-label>להורדת אפליקציית האנדרואיד</ion-label>
           </ion-item>
         }
         <ion-item button [href]="changelogUrl" target="_blank" rel="noopener">
           <ion-icon slot="start" name="logo-github" color="medium" aria-hidden="true"></ion-icon>
-          <ion-label>What's new</ion-label>
+          <ion-label>מה חדש</ion-label>
         </ion-item>
       </ion-list>
       <p class="ion-padding-horizontal">
-        <ion-note>Updates download in the background and apply when you restart, or the next time you leave and reopen the app.</ion-note>
+        <ion-note>עדכונים יורדים ברקע ומותקנים כשמפעילים מחדש, או בפעם הבאה שיוצאים מהאפליקציה וחוזרים אליה. האפליקציה עובדת גם בלי חיבור — שינויים מסתנכרנים כשהחיבור חוזר.</ion-note>
       </p>
     </ion-content>
   `,
@@ -159,17 +159,17 @@ export class SettingsPage {
   protected readonly statusText = computed(() => {
     switch (this.updates.status()) {
       case 'checking':
-        return 'Checking…';
+        return 'בודק…';
       case 'downloading':
-        return 'Downloading…';
+        return 'מוריד…';
       case 'ready':
-        return 'Update ready';
+        return 'עדכון מוכן';
       case 'up-to-date':
-        return 'Up to date';
+        return 'מעודכן';
       case 'needs-apk':
-        return `${this.updates.latest()} available`;
+        return `${this.updates.latest()} זמינה`;
       case 'error':
-        return 'Could not check';
+        return 'הבדיקה נכשלה';
       default:
         return '';
     }
@@ -187,7 +187,7 @@ export class SettingsPage {
     const ok = await this.push.enable().catch(() => false);
     if (!ok) {
       event.target.checked = false;
-      await this.alert.presentToast('Notifications are blocked. Allow them in your device settings.');
+      await this.alert.presentToast('ההתראות חסומות. אפשרו אותן בהגדרות המכשיר.');
     }
   }
 }

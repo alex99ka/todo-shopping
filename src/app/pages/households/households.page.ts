@@ -46,14 +46,14 @@ import { AlertService, EmptyListComponent } from '../../shared';
     <ion-header>
       <ion-toolbar color="primary">
         <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
-        <ion-title>Households</ion-title>
+        <ion-title>משקי בית</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
       <p>
         <ion-note>
-          Everyone in a household sees every list filed under it. Lists you keep out of a
-          household stay private to you and whoever you invite to that list.
+          כל מי שבמשק הבית רואה את כל הרשימות שמשויכות אליו. רשימה שלא משויכת למשק בית
+          נשארת פרטית — רק לך ולמי שהזמנת אליה.
         </ion-note>
       </p>
       <ion-list>
@@ -62,22 +62,22 @@ import { AlertService, EmptyListComponent } from '../../shared';
             <ion-label>
               <h2>{{ h.name }}</h2>
               <p>
-                {{ h.memberUids.length }} {{ h.memberUids.length === 1 ? 'member' : 'members' }}
-                {{ h.ownerUid === uid ? '· you own it' : '' }}
+                {{ h.memberUids.length === 1 ? 'חבר אחד' : h.memberUids.length + ' חברים' }}
+                {{ h.ownerUid === uid ? '· בבעלותך' : '' }}
               </p>
             </ion-label>
-            <ion-button slot="end" fill="clear" aria-label="Invite" (click)="invite(h)">
+            <ion-button slot="end" fill="clear" aria-label="הזמנה" (click)="invite(h)">
               <ion-icon slot="icon-only" name="person-add"></ion-icon>
             </ion-button>
             @if (h.ownerUid === uid) {
-              <ion-button slot="end" fill="clear" color="medium" aria-label="Rename" (click)="rename(h)">
+              <ion-button slot="end" fill="clear" color="medium" aria-label="שינוי שם" (click)="rename(h)">
                 <ion-icon slot="icon-only" name="create"></ion-icon>
               </ion-button>
-              <ion-button slot="end" fill="clear" color="danger" aria-label="Delete" (click)="remove(h)">
+              <ion-button slot="end" fill="clear" color="danger" aria-label="מחיקה" (click)="remove(h)">
                 <ion-icon slot="icon-only" name="trash"></ion-icon>
               </ion-button>
             } @else {
-              <ion-button slot="end" fill="clear" color="danger" aria-label="Leave" (click)="leave(h)">
+              <ion-button slot="end" fill="clear" color="danger" aria-label="עזיבה" (click)="leave(h)">
                 <ion-icon slot="icon-only" name="exit"></ion-icon>
               </ion-button>
             }
@@ -85,14 +85,14 @@ import { AlertService, EmptyListComponent } from '../../shared';
         } @empty {
           <app-empty-list
             icon="home"
-            h1Text="No household yet"
-            h3Text="Create one and invite the people you live with."
+            h1Text="אין עדיין משק בית"
+            h3Text="צרו אחד והזמינו את מי שגר איתכם."
             h3TextSecond=""
           />
         }
       </ion-list>
       <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-        <ion-fab-button aria-label="New household" (click)="create()">
+        <ion-fab-button aria-label="משק בית חדש" (click)="create()">
           <ion-icon name="add"></ion-icon>
         </ion-fab-button>
       </ion-fab>
@@ -113,50 +113,50 @@ export class HouseholdsPage {
 
   protected create(): void {
     void this.alert.createAlert({
-      title: 'New household',
-      inputs: [{ name: 'name', placeholder: 'e.g. Home' }],
-      yesText: 'Create',
-      yesToastThen: 'Household created',
-      yesToastCatch: 'Something wrong happened',
-      yesFunction: (data) => this.service.create((data?.['name'] ?? '').trim() || 'Home'),
+      title: 'משק בית חדש',
+      inputs: [{ name: 'name', placeholder: 'למשל: הבית' }],
+      yesText: 'יצירה',
+      yesToastThen: 'משק הבית נוצר',
+      yesToastCatch: 'משהו השתבש',
+      yesFunction: (data) => this.service.create((data?.['name'] ?? '').trim() || 'הבית'),
     });
   }
 
   protected invite(h: Household): void {
     this.invites
       .share('household', h.id, h.name)
-      .catch(() => this.alert.presentToast('Could not create the invite'));
+      .catch(() => this.alert.presentToast('לא הצלחנו ליצור הזמנה'));
   }
 
   protected rename(h: Household): void {
     void this.alert.createAlert({
-      title: 'Rename household',
+      title: 'שינוי שם',
       inputs: [{ name: 'name', value: h.name }],
-      yesText: 'Save',
-      yesToastThen: 'Household renamed',
-      yesToastCatch: 'Something wrong happened',
+      yesText: 'שמירה',
+      yesToastThen: 'השם שונה',
+      yesToastCatch: 'משהו השתבש',
       yesFunction: (data) => this.service.rename(h.id, (data?.['name'] ?? '').trim() || h.name),
     });
   }
 
   protected leave(h: Household): void {
     void this.alert.createAlert({
-      title: 'Leave household?',
-      message: `You will no longer see the lists filed under "${h.name}".`,
-      yesText: 'Leave',
-      yesToastThen: 'You left the household',
-      yesToastCatch: 'Something wrong happened',
+      title: 'לעזוב את משק הבית?',
+      message: `לא תראו יותר את הרשימות של "${h.name}".`,
+      yesText: 'עזיבה',
+      yesToastThen: 'עזבת את משק הבית',
+      yesToastCatch: 'משהו השתבש',
       yesFunction: () => this.service.leave(h.id),
     });
   }
 
   protected remove(h: Household): void {
     void this.alert.createAlert({
-      title: 'Delete household?',
-      message: 'Its lists are kept, but only their own members will still see them.',
-      yesText: 'Delete',
-      yesToastThen: 'Household deleted',
-      yesToastCatch: 'Something wrong happened',
+      title: 'למחוק את משק הבית?',
+      message: 'הרשימות שלו נשמרות, אבל רק מי שהוזמן אליהן ישירות ימשיך לראות אותן.',
+      yesText: 'מחיקה',
+      yesToastThen: 'משק הבית נמחק',
+      yesToastCatch: 'משהו השתבש',
       yesFunction: () => this.service.delete(h.id),
     });
   }

@@ -17,8 +17,14 @@ Hamidi, MIT licensed. See [CHANGELOG.md](CHANGELOG.md) for what changed.
 ## Features
 
 - Google sign-in.
-- Todo lists and shopping lists. Shopping items are grouped by grocery category and
-  checked off with one tap.
+- Hebrew, right-to-left interface.
+- Two kinds of list, chosen when you create one:
+  - Shopping lists: items grouped by aisle, checked off with one tap, with checked
+    items moved to an "in the basket" section.
+  - Task lists: deadlines, priority and reminders, grouped into overdue, today,
+    later, no deadline and done.
+- Works offline: Firestore's on-device cache keeps lists readable and queues edits
+  until the connection returns.
 - Households: every list in a household is shared with all its members.
 - Invite links for a list or a household, valid for 7 days.
 - Task reminders, and push notifications for new items on shared lists, due reminders and new versions.

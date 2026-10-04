@@ -1,10 +1,15 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
-const SECOND = 1000;
-const MINUTE = 60 * SECOND;
+const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const WEEK = 7 * DAY;
+const rtf = new Intl.RelativeTimeFormat('he', { numeric: 'auto' });
+// Hebrew ICU appends the number to its word forms: "לפני שעתיים (2)".
+const relative = {
+  format: (value: number, unit: Intl.RelativeTimeFormatUnit) =>
+    rtf.format(value, unit).replace(/ \(\d+\)$/, ''),
+};
 
 @Pipe({ name: 'dateCreated' })
 export class DateCreatedPipe implements PipeTransform {
@@ -13,11 +18,10 @@ export class DateCreatedPipe implements PipeTransform {
       return '';
     }
     const diff = Date.now() - dateCreated;
-    if (diff > WEEK) return new Date(dateCreated).toDateString();
-    if (diff > DAY) return `${Math.round(diff / DAY)} days ago`;
-    if (diff > HOUR) return `${Math.round(diff / HOUR)} hours ago`;
-    if (diff > MINUTE) return `${Math.round(diff / MINUTE)} minutes ago`;
-    if (diff > SECOND) return `${Math.round(diff / SECOND)} seconds ago`;
-    return 'one second ago';
+    if (diff > WEEK) return new Date(dateCreated).toLocaleDateString('he-IL');
+    if (diff > DAY) return relative.format(-Math.round(diff / DAY), 'day');
+    if (diff > HOUR) return relative.format(-Math.round(diff / HOUR), 'hour');
+    if (diff > MINUTE) return relative.format(-Math.round(diff / MINUTE), 'minute');
+    return 'הרגע';
   }
 }

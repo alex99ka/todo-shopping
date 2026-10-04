@@ -1,7 +1,9 @@
 {
-  "name": "Todo and Shopping",
-  "short_name": "Lists",
-  "description": "Shared to-do lists and a shopping list sorted by aisle, synced across your household.",
+  "name": "משימות וקניות",
+  "short_name": "רשימות",
+  "lang": "he",
+  "dir": "rtl",
+  "description": "רשימות משימות משותפות ורשימת קניות מסודרת לפי מחלקות, מסונכרנות לכל הבית.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -30,7 +30,15 @@ import type { Timestamp } from 'firebase/firestore';
 import { addIcons } from 'ionicons';
 import { camera, close, image as imageIcon, mic } from 'ionicons/icons';
 import { PhotoService, TodoListService } from '../../core';
-import { CATEGORIES, Item, ItemChanges, newItem } from '../../models';
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  Item,
+  ItemChanges,
+  PRIORITY_LABELS,
+  Priority,
+  newItem,
+} from '../../models';
 import { AlertService, MediaService, SpeechService } from '../../shared';
 
 type VoiceField = 'name' | 'description';
@@ -67,7 +75,12 @@ export class ItemDetailsModalComponent implements OnInit {
   shopping = false;
 
   protected readonly categories = CATEGORIES;
+  protected readonly categoryLabels = CATEGORY_LABELS;
+  protected readonly priorities = Object.entries(PRIORITY_LABELS) as [Priority, string][];
   protected readonly category = signal('Other');
+  protected readonly priority = signal<Priority>('normal');
+  /** 'YYYY-MM-DD', as <input type="date"> wants it. */
+  protected readonly dueAt = signal('');
   /** 'YYYY-MM-DDTHH:mm' in local time, as <input type="datetime-local"> wants it. */
   protected readonly remindAt = signal('');
 
@@ -105,6 +118,8 @@ export class ItemDetailsModalComponent implements OnInit {
     this.state.set(seed.state);
     this.category.set(this.item?.category ?? 'Other');
     this.remindAt.set(this.item?.remindAt ? toLocalInput(this.item.remindAt) : '');
+    this.dueAt.set(this.item?.dueAt ? toLocalInput(this.item.dueAt).slice(0, 10) : '');
+    this.priority.set(this.item?.priority ?? 'normal');
     this.date = seed.date;
     this.itemId = this.item?.id ?? this.todoLists.newItemId(this.listId);
     const path = this.item?.photoPath;
@@ -114,12 +129,12 @@ export class ItemDetailsModalComponent implements OnInit {
   }
 
   protected async addItem(): Promise<void> {
-    await this.save(null, this.shopping ? 'Added' : 'Task added');
+    await this.save(null, this.shopping ? 'נוסף' : 'המשימה נוספה');
   }
 
   protected async updateItem(): Promise<void> {
     if (this.item) {
-      await this.save(this.item, 'Saved');
+      await this.save(this.item, 'נשמר');
     }
   }
 
@@ -139,7 +154,7 @@ export class ItemDetailsModalComponent implements OnInit {
 
   protected async inputVoice(field: VoiceField): Promise<void> {
     if (!(await this.speech.isReady())) {
-      await this.alert.presentToast('Voice input is only available in the app');
+      await this.alert.presentToast('הקלטה קולית זמינה רק באפליקציה');
       return;
     }
     const text = await this.speech.listen();
@@ -162,6 +177,8 @@ export class ItemDetailsModalComponent implements OnInit {
   private async save(existing: Item | null, successToast: string): Promise<void> {
     const listCreatedAt = this.listCreatedAt;
     if (!listCreatedAt) {
+      // A list created offline gets its server timestamp only once it syncs.
+      await this.alert.presentToast('הרשימה עוד לא סונכרנה. נסו שוב כשיש חיבור.');
       return;
     }
     const changes: ItemChanges = {
@@ -174,6 +191,9 @@ export class ItemDetailsModalComponent implements OnInit {
       ...(this.shopping && { category: this.category() }),
     };
     if (!this.shopping) {
+      // 'YYYY-MM-DD' alone parses as UTC; with a time it is local midnight.
+      changes.dueAt = this.dueAt() ? new Date(`${this.dueAt()}T00:00`).getTime() : null;
+      changes.priority = this.priority();
       const at = this.remindAt() ? new Date(this.remindAt()).getTime() : null;
       // Only touch the reminder when it changed, so editing the text of an item
       // whose reminder already fired does not fire it again.
@@ -183,6 +203,17 @@ export class ItemDetailsModalComponent implements OnInit {
       }
     }
     const pending = this.pendingPhoto();
+    if (!pending) {
+      // No upload: write without waiting for the server, so saving works offline
+      // (Firestore keeps the write and syncs it later).
+      const write = existing
+        ? this.todoLists.updateItem(this.listId, existing.id, changes)
+        : this.todoLists.createItem(this.listId, this.itemId, { ...changes, listCreatedAt });
+      write.catch(() => this.alert.presentToast('השמירה נכשלה'));
+      await this.alert.presentToast(successToast);
+      await this.dismiss(true);
+      return;
+    }
     let uploaded: string | undefined;
     try {
       if (pending) {
@@ -198,7 +229,7 @@ export class ItemDetailsModalComponent implements OnInit {
       if (uploaded) {
         await this.photos.removeQuietly(uploaded);
       }
-      await this.alert.presentToast('Something wrong happened');
+      await this.alert.presentToast('משהו השתבש');
       return;
     }
     if (uploaded && existing?.photoPath) {

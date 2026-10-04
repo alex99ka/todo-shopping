@@ -37,7 +37,7 @@ export class InviteService {
     });
     // Always the hosted URL: inside the Android app location.origin is localhost.
     const url = `${environment.appUrl}/join/${created.id}`;
-    const text = `Join "${targetName}" (link valid for 7 days)`;
+    const text = `הצטרפות ל"${targetName}" (הקישור בתוקף 7 ימים)`;
     if (navigator.share) {
       try {
         await navigator.share({ title: targetName, text, url });
@@ -47,7 +47,7 @@ export class InviteService {
       }
     }
     await navigator.clipboard.writeText(url);
-    await this.alert.presentToast('Invite link copied (valid for 7 days)');
+    await this.alert.presentToast('קישור ההזמנה הועתק (בתוקף 7 ימים)');
   }
 
   async get(inviteId: string): Promise<Invite | null> {

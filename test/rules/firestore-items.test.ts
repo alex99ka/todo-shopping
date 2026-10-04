@@ -289,3 +289,15 @@ test("an edit keeps the item's creation date", async () => {
     await assertFails(updateDoc(ref, { name: 'Call me', date: ITEM.date + 1 }));
   });
 });
+
+test('a task takes a deadline and a priority, checked for type', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const db = env.authenticatedContext(MEMBER).firestore();
+    const ref = doc(db, 'lists/list-1/items/item-1');
+    await assertSucceeds(updateDoc(ref, { dueAt: 5000, priority: 'high' }));
+    await assertSucceeds(updateDoc(ref, { dueAt: null, priority: 'low' }));
+    await assertFails(updateDoc(ref, { dueAt: 'tomorrow' }));
+    await assertFails(updateDoc(ref, { priority: 'urgent' }));
+  });
+});

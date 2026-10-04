@@ -9,6 +9,29 @@ versions reach installed apps as an in-app update.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-04
+
+### Added
+
+- Every list is now either a shopping list or a task list, chosen when you create it.
+  Lists from 1.0.0 named "Shopping" count as shopping lists.
+- Tasks have a deadline and a priority. A task list groups them into overdue, today,
+  later, no deadline and done; overdue tasks show in red, high priority with a flag.
+- Shopping lists keep the aisle grouping and move checked items to an "in the basket"
+  section at the end.
+- Works offline: lists are cached on the device, and items you add, check off or
+  delete while offline sync when the connection returns.
+
+### Changed
+
+- The whole interface is in Hebrew and right-to-left, including notifications.
+  Voice input listens in Hebrew.
+
+### Fixed
+
+- A list deleted or left while open no longer breaks the page.
+- An update already downloaded on Android is not downloaded again on the next check.
+
 ## [1.0.0] - 2026-10-04
 
 First release of Todo and Shopping, forked from
@@ -45,5 +68,6 @@ First release of Todo and Shopping, forked from
 - The non-working username/password and Facebook sign-in buttons (Google only).
 - The upstream site's Google Analytics snippet and the third-party avatar service.
 
-[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.0.0...HEAD
+[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/alex99ka/todo-shopping/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/alex99ka/todo-shopping/releases/tag/1.0.0

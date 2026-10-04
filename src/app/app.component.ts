@@ -64,12 +64,11 @@ export class AppComponent {
 
   protected confirmSignOut(): void {
     const alert: CustomAlert = {
-      title: 'Sign Out?',
-      message: 'This device will stop getting notifications for this account.',
-      noText: 'Cancel',
-      yesText: 'Yes',
-      yesToastThen: 'Successfully signed out',
-      yesToastCatch: 'Something wrong happened',
+      title: 'להתנתק?',
+      message: 'המכשיר הזה יפסיק לקבל התראות עבור החשבון.',
+      yesText: 'התנתקות',
+      yesToastThen: 'התנתקת',
+      yesToastCatch: 'משהו השתבש',
       yesFunction: () => this.signOut(),
     };
     void this.alert.createAlert(alert);

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.alex99ka.todoshop',
-  appName: 'Todo and Shopping',
+  appName: 'משימות וקניות',
   webDir: 'www',
   plugins: {
     SplashScreen: {

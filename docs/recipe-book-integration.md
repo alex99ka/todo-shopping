@@ -49,7 +49,7 @@ Then the server responds:
 1. Signs the user in if needed, then returns to the page.
 2. Parses the fragment and keeps at most 100 items. Every string is trimmed to 200 characters, and an unknown category becomes `Other`.
 3. Shows a preview grouped by aisle with an **Add N items** button. Nothing is written until the user taps it, because anyone can craft an `/import#…` link.
-4. Adds the items to the household's `Shopping` list, creating the list if it is missing. The list groups items by category.
+4. Adds the items to the household's shopping list (a list with `kind: 'shopping'`, or a 1.0.0 list named `Shopping`), creating one named `קניות` if it is missing. The list groups items by category.
    - If an unchecked item with the same name (ignoring case) is already on the list, the new quantity and the recipe title are appended to that item's description. No second line is added.
    - New items get the description `<quantity> · <recipe>`.
 5. Opens the list.

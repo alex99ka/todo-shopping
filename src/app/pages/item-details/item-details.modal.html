@@ -1,8 +1,8 @@
 <ion-header>
   <ion-toolbar color="primary">
-    <ion-title>{{ item ? 'Edit' : shopping ? 'Add item' : 'New task' }}</ion-title>
+    <ion-title>{{ item ? 'עריכה' : shopping ? 'פריט חדש' : 'משימה חדשה' }}</ion-title>
     <ion-buttons slot="end">
-      <ion-button aria-label="Close" (click)="dismiss(false)">
+      <ion-button aria-label="סגירה" (click)="dismiss(false)">
         <ion-icon slot="icon-only" name="close" aria-hidden="true"></ion-icon>
       </ion-button>
     </ion-buttons>
@@ -12,56 +12,73 @@
 <ion-content class="ion-padding">
   <ion-item>
     <ion-input
-      [label]="shopping ? 'Item' : 'Task'"
+      [label]="shopping ? 'מה לקנות' : 'משימה'"
       labelPlacement="stacked"
       type="text"
+      dir="auto"
       maxlength="500"
       [(ngModel)]="name"
     ></ion-input>
-    <ion-button slot="end" size="large" fill="clear" color="medium" aria-label="Dictate" (click)="inputVoice('name')">
+    <ion-button slot="end" size="large" fill="clear" color="medium" aria-label="הכתבה" (click)="inputVoice('name')">
       <ion-icon slot="icon-only" name="mic" aria-hidden="true"></ion-icon>
     </ion-button>
   </ion-item>
 
-  <ion-item>
-    <ion-textarea
-      [label]="shopping ? 'Amount / notes' : 'Notes'"
-      labelPlacement="stacked"
-      [autoGrow]="true"
-      maxlength="5000"
-      [(ngModel)]="description"
-    ></ion-textarea>
-    <ion-button slot="end" size="large" fill="clear" color="medium" aria-label="Dictate" (click)="inputVoice('description')">
-      <ion-icon slot="icon-only" name="mic" aria-hidden="true"></ion-icon>
-    </ion-button>
-  </ion-item>
+  @if (shopping) {
+    <ion-item>
+      <ion-select label="מחלקה" labelPlacement="stacked" interface="action-sheet" [(ngModel)]="category">
+        @for (c of categories; track c) {
+          <ion-select-option [value]="c">{{ categoryLabels[c] }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+  } @else {
+    <ion-item>
+      <ion-input label="תאריך יעד" labelPlacement="stacked" type="date" [(ngModel)]="dueAt"></ion-input>
+      @if (dueAt()) {
+        <ion-button slot="end" fill="clear" color="medium" aria-label="הסרת תאריך יעד" (click)="dueAt.set('')">
+          <ion-icon slot="icon-only" name="close" aria-hidden="true"></ion-icon>
+        </ion-button>
+      }
+    </ion-item>
 
-  @if (!shopping) {
+    <ion-item>
+      <ion-select label="עדיפות" labelPlacement="stacked" interface="popover" [(ngModel)]="priority">
+        @for (p of priorities; track p[0]) {
+          <ion-select-option [value]="p[0]">{{ p[1] }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+
     <ion-item>
       <ion-input
-        label="Remind me"
+        label="תזכורת"
         labelPlacement="stacked"
         type="datetime-local"
-        helperText="Sent as a notification to everyone on this list"
+        helperText="התראה לכל מי שברשימה"
         [(ngModel)]="remindAt"
       ></ion-input>
       @if (remindAt()) {
-        <ion-button slot="end" fill="clear" color="medium" aria-label="Remove reminder" (click)="remindAt.set('')">
+        <ion-button slot="end" fill="clear" color="medium" aria-label="הסרת תזכורת" (click)="remindAt.set('')">
           <ion-icon slot="icon-only" name="close" aria-hidden="true"></ion-icon>
         </ion-button>
       }
     </ion-item>
   }
 
-  @if (shopping) {
-    <ion-item>
-      <ion-select label="Aisle" labelPlacement="stacked" interface="action-sheet" [(ngModel)]="category">
-        @for (c of categories; track c) {
-          <ion-select-option [value]="c">{{ c }}</ion-select-option>
-        }
-      </ion-select>
-    </ion-item>
-  }
+  <ion-item>
+    <ion-textarea
+      [label]="shopping ? 'כמות / הערות' : 'הערות'"
+      labelPlacement="stacked"
+      dir="auto"
+      [autoGrow]="true"
+      maxlength="5000"
+      [(ngModel)]="description"
+    ></ion-textarea>
+    <ion-button slot="end" size="large" fill="clear" color="medium" aria-label="הכתבה" (click)="inputVoice('description')">
+      <ion-icon slot="icon-only" name="mic" aria-hidden="true"></ion-icon>
+    </ion-button>
+  </ion-item>
 
   <!-- ponytail: photo buttons removed; Cloud Storage needs the paid Blaze plan.
        Restore takePicture()/pickFromLibrary() buttons from upstream if you upgrade. -->
@@ -72,19 +89,19 @@
 
   <ion-item lines="none">
     <ion-checkbox justify="start" labelPlacement="end" [(ngModel)]="state">
-      {{ shopping ? 'In the basket' : 'Done' }}
+      {{ shopping ? 'בסל' : 'בוצע' }}
     </ion-checkbox>
   </ion-item>
 
   <ion-row class="ion-padding-top">
     <ion-col>
-      <ion-button fill="outline" color="medium" expand="block" (click)="dismiss(false)">Cancel</ion-button>
+      <ion-button fill="outline" color="medium" expand="block" (click)="dismiss(false)">ביטול</ion-button>
     </ion-col>
     <ion-col>
       @if (item) {
-        <ion-button expand="block" [disabled]="!name().trim()" (click)="updateItem()">Save</ion-button>
+        <ion-button expand="block" [disabled]="!name().trim()" (click)="updateItem()">שמירה</ion-button>
       } @else {
-        <ion-button expand="block" [disabled]="!name().trim()" (click)="addItem()">Add</ion-button>
+        <ion-button expand="block" [disabled]="!name().trim()" (click)="addItem()">הוספה</ion-button>
       }
     </ion-col>
   </ion-row>

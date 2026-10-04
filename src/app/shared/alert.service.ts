@@ -21,9 +21,9 @@ export class AlertService {
       message: alert.message,
       inputs: alert.inputs ?? [],
       buttons: [
-        { text: alert.noText ?? 'Cancel', role: 'cancel' },
+        { text: alert.noText ?? 'ביטול', role: 'cancel' },
         {
-          text: alert.yesText ?? 'Yes',
+          text: alert.yesText ?? 'אישור',
           handler: (data: Record<string, string>) => {
             void this.run(alert, data);
           },

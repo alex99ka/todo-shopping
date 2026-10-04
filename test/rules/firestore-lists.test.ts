@@ -326,3 +326,20 @@ test('a user reads only their own profile', async () => {
     await assertFails(getDocs(collection(db, 'users')));
   });
 });
+
+test('a list is created as shopping or todo, and nothing else', async () => {
+  await withTestEnv(async (env) => {
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(setDoc(doc(db, 'lists/s'), { ...newList(OWNER, [OWNER]), kind: 'shopping' }));
+    await assertSucceeds(setDoc(doc(db, 'lists/t'), { ...newList(OWNER, [OWNER]), kind: 'todo' }));
+    await assertFails(setDoc(doc(db, 'lists/x'), { ...newList(OWNER, [OWNER]), kind: 'party' }));
+  });
+});
+
+test('the owner cannot change a list kind', async () => {
+  await withTestEnv(async (env) => {
+    const db = env.authenticatedContext(OWNER).firestore();
+    await setDoc(doc(db, 'lists/s'), { ...newList(OWNER, [OWNER]), kind: 'shopping' });
+    await assertFails(updateDoc(doc(db, 'lists/s'), { kind: 'todo' }));
+  });
+});

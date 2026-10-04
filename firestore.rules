@@ -157,7 +157,9 @@ service cloud.firestore {
       }
 
       allow read: if canUseList(resource.data);
-      allow create: if signedIn() && validNewGroup(['householdId', 'householdCreatedAt'])
+      // kind is fixed at creation: no update below may change it.
+      allow create: if signedIn() && validNewGroup(['householdId', 'householdCreatedAt', 'kind'])
+        && request.resource.data.get('kind', 'todo') in ['todo', 'shopping']
         && validHousehold();
       allow delete: if isOwner();
       allow update: if (isOwner()
@@ -181,7 +183,8 @@ service cloud.firestore {
         function validItem() {
           let d = request.resource.data;
           return d.keys().hasOnly(['name', 'state', 'description', 'date', 'listCreatedAt',
-                                   'photoPath', 'category', 'remindAt', 'reminded', 'by'])
+                                   'photoPath', 'category', 'remindAt', 'reminded', 'by',
+                                   'dueAt', 'priority'])
             && d.name is string && d.name.size() <= 500
             && d.description is string && d.description.size() <= 5000
             && d.state is bool
@@ -189,7 +192,9 @@ service cloud.firestore {
             && d.get('category', '') is string && d.get('category', '').size() <= 50
             && d.get('photoPath', '') is string && d.get('photoPath', '').size() <= 300
             && (d.get('remindAt', null) == null || d.remindAt is number)
-            && d.get('reminded', false) is bool;
+            && d.get('reminded', false) is bool
+            && (d.get('dueAt', null) == null || d.dueAt is number)
+            && d.get('priority', 'normal') in ['high', 'normal', 'low'];
         }
 
         allow read: if canUseList(parent()) && sameEpoch(resource.data);

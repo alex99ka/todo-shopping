@@ -20,9 +20,20 @@ import {
   IonSpinner,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { add, basket, create, exit, home, lockClosed, people, personAdd, trash } from 'ionicons/icons';
+import {
+  add,
+  basket,
+  checkboxOutline,
+  create,
+  exit,
+  home,
+  lockClosed,
+  people,
+  personAdd,
+  trash,
+} from 'ionicons/icons';
 import { AuthService, HouseholdService, InviteService, TodoListService } from '../../core';
-import { CustomAlert, Household, SHOPPING_LIST, TodoList } from '../../models';
+import { Household, ListKind, SHOPPING_LIST, TodoList, isShopping } from '../../models';
 import { DateCreatedPipe } from '../../pipes';
 import { AlertService, EmptyListComponent, NavBarComponent } from '../../shared';
 
@@ -78,22 +89,25 @@ export class HomePage {
   // Personal lists first, then one section per household, each sorted by name.
   protected readonly sections = computed<Section[]>(() => {
     const term = this.search().trim().toLowerCase();
+    // Shopping lists first, then tasks, each by name.
     const lists = (this.lists() ?? [])
       .filter((l) => l.name.toLowerCase().includes(term))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    const households = [...this.households()].sort((a, b) => a.name.localeCompare(b.name));
+      .sort(
+        (a, b) => Number(isShopping(b)) - Number(isShopping(a)) || a.name.localeCompare(b.name, 'he'),
+      );
+    const households = [...this.households()].sort((a, b) => a.name.localeCompare(b.name, 'he'));
     const known = new Set(households.map((h) => h.id));
     const sections: Section[] = [
       {
         id: '',
-        title: 'Personal',
+        title: 'אישי',
         icon: 'lock-closed',
         lists: lists.filter((l) => !l.householdId),
       },
       {
         // Filed under someone else's household and shared with you directly.
         id: 'shared',
-        title: 'Shared with you',
+        title: 'שותפו איתך',
         icon: 'people',
         lists: lists.filter((l) => l.householdId && !known.has(l.householdId)),
       },
@@ -108,16 +122,14 @@ export class HomePage {
   });
 
   constructor() {
-    addIcons({ add, basket, create, exit, home, lockClosed, people, personAdd, trash });
+    addIcons({ add, basket, checkboxOutline, create, exit, home, lockClosed, people, personAdd, trash });
   }
 
   protected toggleSearchBar(): void {
     this.searchBarHidden.update((hidden) => !hidden);
   }
 
-  protected isShopping(list: TodoList): boolean {
-    return list.name === SHOPPING_LIST;
-  }
+  protected readonly isShopping = isShopping;
 
   protected goToDetails(todoList: TodoList): void {
     void this.router.navigate(['/details', todoList.id]);
@@ -126,17 +138,33 @@ export class HomePage {
   protected invite(todoList: TodoList): void {
     this.invites
       .share('list', todoList.id, todoList.name)
-      .catch(() => this.alert.presentToast('Could not create the invite'));
+      .catch(() => this.alert.presentToast('לא הצלחנו ליצור הזמנה'));
   }
 
-  protected addList(): void {
-    const alert: CustomAlert = {
-      title: 'New list',
-      message: `Name it "${SHOPPING_LIST}" to get grocery categories and recipe imports.`,
-      inputs: [{ name: 'name', placeholder: 'e.g. Weekend chores' }],
-      noText: 'Cancel',
-      yesText: 'Next',
-      yesToastCatch: 'Something wrong happened',
+  protected async addList(): Promise<void> {
+    const sheet = await this.actionSheet.create({
+      header: 'איזו רשימה?',
+      buttons: [
+        { text: 'רשימת קניות — לפי מחלקות בסופר', icon: 'basket', data: 'shopping' },
+        { text: 'רשימת משימות — עם תאריכי יעד ותזכורות', icon: 'checkbox-outline', data: 'todo' },
+        { text: 'ביטול', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+    const { data: kind } = await sheet.onDidDismiss<ListKind>();
+    if (kind !== 'shopping' && kind !== 'todo') {
+      return;
+    }
+    const shopping = kind === 'shopping';
+    void this.alert.createAlert({
+      title: shopping ? 'רשימת קניות חדשה' : 'רשימת משימות חדשה',
+      inputs: [
+        shopping
+          ? { name: 'name', value: SHOPPING_LIST }
+          : { name: 'name', placeholder: 'למשל: סידורים לסופ״ש' },
+      ],
+      yesText: 'המשך',
+      yesToastCatch: 'משהו השתבש',
       yesFunction: async (data) => {
         const name = (data?.['name'] ?? '').trim();
         if (!name) {
@@ -146,11 +174,10 @@ export class HomePage {
         if (household === undefined) {
           return;
         }
-        const id = await this.todoListService.createList(name, household);
+        const id = await this.todoListService.createList(name, kind, household);
         await this.router.navigate(['/details', id]);
       },
-    };
-    void this.alert.createAlert(alert);
+    });
   }
 
   /** null = personal, undefined = cancelled. Skips the question when there is no household. */
@@ -160,11 +187,11 @@ export class HomePage {
       return null;
     }
     const sheet = await this.actionSheet.create({
-      header: 'Who should see this list?',
+      header: 'מי יראה את הרשימה?',
       buttons: [
-        ...households.map((h) => ({ text: `Household: ${h.name}`, data: h })),
-        { text: 'Only me (personal)', data: null },
-        { text: 'Cancel', role: 'cancel' },
+        ...households.map((h) => ({ text: `משק הבית: ${h.name}`, data: h })),
+        { text: 'רק אני (אישי)', data: null },
+        { text: 'ביטול', role: 'cancel' },
       ],
     });
     await sheet.present();
@@ -174,36 +201,33 @@ export class HomePage {
 
   protected deleteList(todoList: TodoList): void {
     void this.alert.createAlert({
-      title: 'Delete list?',
-      message: `"${todoList.name}" and everything on it will be removed for everyone.`,
-      noText: 'Cancel',
-      yesText: 'Delete',
-      yesToastThen: 'List deleted',
-      yesToastCatch: 'Something wrong happened',
+      title: 'למחוק את הרשימה?',
+      message: `"${todoList.name}" וכל מה שבה יימחקו אצל כולם.`,
+      yesText: 'מחיקה',
+      yesToastThen: 'הרשימה נמחקה',
+      yesToastCatch: 'משהו השתבש',
       yesFunction: () => this.todoListService.deleteList(todoList.id),
     });
   }
 
   protected leaveList(todoList: TodoList): void {
     void this.alert.createAlert({
-      title: 'Leave list?',
-      message: `You will no longer see "${todoList.name}".`,
-      noText: 'Cancel',
-      yesText: 'Leave',
-      yesToastThen: 'You left the list',
-      yesToastCatch: 'You can only leave lists you joined directly',
+      title: 'לעזוב את הרשימה?',
+      message: `לא תראו יותר את "${todoList.name}".`,
+      yesText: 'עזיבה',
+      yesToastThen: 'עזבת את הרשימה',
+      yesToastCatch: 'אפשר לעזוב רק רשימה שהצטרפת אליה ישירות',
       yesFunction: () => this.todoListService.leaveList(todoList.id),
     });
   }
 
   protected renameList(todoList: TodoList): void {
     void this.alert.createAlert({
-      title: 'Rename list',
+      title: 'שינוי שם',
       inputs: [{ name: 'name', value: todoList.name }],
-      noText: 'Cancel',
-      yesText: 'Save',
-      yesToastThen: 'List renamed',
-      yesToastCatch: 'Something wrong happened',
+      yesText: 'שמירה',
+      yesToastThen: 'השם שונה',
+      yesToastCatch: 'משהו השתבש',
       yesFunction: (data) =>
         this.todoListService.renameList(todoList.id, (data?.['name'] ?? '').trim() || todoList.name),
     });

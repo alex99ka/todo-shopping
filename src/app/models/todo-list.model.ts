@@ -14,12 +14,21 @@ export interface Item {
   reminded?: boolean;
   /** Uid of whoever added the item, so the notifier does not ping them about it. */
   by?: string;
+  /** Tasks only: deadline, epoch ms of the due day's local midnight. */
+  dueAt?: number | null;
+  /** Tasks only. */
+  priority?: Priority;
 }
+
+export type Priority = 'high' | 'normal' | 'low';
+export type ListKind = 'shopping' | 'todo';
 
 export interface TodoList {
   id: string;
   ownerUid: string;
   name: string;
+  /** Set at creation, never changed. Lists from before 1.1 have none. */
+  kind?: ListKind;
   date: number;
   createdAt: Timestamp;
   memberUids: string[];
@@ -55,12 +64,18 @@ export interface Invite {
 }
 
 export type ItemChanges = Pick<Item, 'name' | 'state' | 'description' | 'date'> &
-  Partial<Pick<Item, 'photoPath' | 'category' | 'remindAt' | 'reminded'>>;
+  Partial<Pick<Item, 'photoPath' | 'category' | 'remindAt' | 'reminded' | 'dueAt' | 'priority'>>;
 
-/** The list recipe ingredients land in. Its items are grouped by category. */
-export const SHOPPING_LIST = 'Shopping';
+/** Default name of a new shopping list. */
+export const SHOPPING_LIST = 'קניות';
 
-// Aisle order. The recipe server's ai.py returns exactly these strings.
+/** Lists from before `kind` existed were shopping lists only when named "Shopping". */
+export function isShopping(list: Pick<TodoList, 'kind' | 'name'>): boolean {
+  return list.kind ? list.kind === 'shopping' : list.name === 'Shopping';
+}
+
+// Aisle order. The recipe server's ai.py returns exactly these strings, so they
+// stay English in the database; CATEGORY_LABELS is what the UI shows.
 export const CATEGORIES = [
   'Fruits & Vegetables',
   'Meat & Fish',
@@ -73,6 +88,25 @@ export const CATEGORIES = [
   'Household',
   'Other',
 ] as const;
+
+export const CATEGORY_LABELS: Record<string, string> = {
+  'Fruits & Vegetables': 'פירות וירקות',
+  'Meat & Fish': 'בשר ודגים',
+  'Dairy & Eggs': 'חלב וביצים',
+  Bakery: 'מאפים ולחם',
+  Pantry: 'מזווה',
+  'Spices & Sauces': 'תבלינים ורטבים',
+  Frozen: 'קפואים',
+  Drinks: 'משקאות',
+  Household: 'ניקיון ובית',
+  Other: 'אחר',
+};
+
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  high: 'גבוהה',
+  normal: 'רגילה',
+  low: 'נמוכה',
+};
 
 export function newItem(): Omit<Item, 'id' | 'listCreatedAt'> {
   return { name: '', state: false, description: '', date: Date.now() };

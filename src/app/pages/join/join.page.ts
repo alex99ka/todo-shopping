@@ -18,19 +18,19 @@ import { Invite } from '../../models';
   imports: [IonButton, IonContent, IonHeader, IonSpinner, IonText, IonTitle, IonToolbar],
   template: `
     <ion-header>
-      <ion-toolbar color="primary"><ion-title>Invitation</ion-title></ion-toolbar>
+      <ion-toolbar color="primary"><ion-title>הזמנה</ion-title></ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding ion-text-center">
       @if (error()) {
         <ion-text color="danger"><p>{{ error() }}</p></ion-text>
-        <ion-button fill="clear" (click)="go('/home')">Go to my lists</ion-button>
+        <ion-button fill="clear" (click)="go('/home')">לרשימות שלי</ion-button>
       } @else if (invite(); as inv) {
-        <h2>Join {{ inv.kind === 'list' ? 'the list' : 'the household' }} "{{ inv.targetName }}"?</h2>
+        <h2>להצטרף {{ inv.kind === 'list' ? 'לרשימה' : 'למשק הבית' }} "{{ inv.targetName }}"?</h2>
         @if (inv.kind === 'household') {
-          <p>You will see every list filed under this household.</p>
+          <p>תראו את כל הרשימות של משק הבית הזה.</p>
         }
-        <ion-button [disabled]="busy()" (click)="join(inv)">Join</ion-button>
-        <ion-button fill="clear" (click)="go('/home')">Not now</ion-button>
+        <ion-button [disabled]="busy()" (click)="join(inv)">הצטרפות</ion-button>
+        <ion-button fill="clear" (click)="go('/home')">לא עכשיו</ion-button>
       } @else {
         <ion-spinner></ion-spinner>
       }
@@ -48,8 +48,8 @@ export class JoinPage {
 
   constructor() {
     void this.invites.get(this.inviteId).then(
-      (inv) => (inv ? this.invite.set(inv) : this.error.set('This invitation does not exist.')),
-      () => this.error.set('This invitation does not exist.'),
+      (inv) => (inv ? this.invite.set(inv) : this.error.set('ההזמנה הזו לא קיימת.')),
+      () => this.error.set('ההזמנה הזו לא קיימת.'),
     );
   }
 
@@ -59,7 +59,7 @@ export class JoinPage {
       await this.go(await this.invites.join(this.inviteId, inv));
     } catch {
       // The rules refuse an invite older than 7 days.
-      this.error.set('This invitation has expired. Ask for a new link.');
+      this.error.set('פג תוקף ההזמנה. בקשו קישור חדש.');
     }
   }
 
