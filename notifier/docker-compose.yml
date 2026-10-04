@@ -1,0 +1,15 @@
+services:
+  notifier:
+    build: .
+    restart: always
+    volumes:
+      - ./service-account.json:/app/service-account.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /app/service-account.json
+      APP_URL: https://alex-todo-shopping.web.app
+      GITHUB_REPO: alex99ka/todo-shopping
+      POLL_SECONDS: "30"
+    logging:
+      options:
+        max-size: 1m
+        max-file: "3"

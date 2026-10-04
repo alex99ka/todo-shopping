@@ -33,6 +33,8 @@ test('the TodoListService payloads and queries are allowed end to end', async ()
       createdAt: serverTimestamp(),
       memberUids: [OWNER],
       joinedAt: { [OWNER]: serverTimestamp() },
+      householdId: null,
+      householdCreatedAt: null,
     });
 
     const mine = await getDocs(
@@ -44,12 +46,15 @@ test('the TodoListService payloads and queries are allowed end to end', async ()
     assert.ok(createdAt instanceof Timestamp);
 
     const itemId = doc(collection(db, 'lists', created.id, 'items')).id;
+    const itemDate = Date.now();
     await setDoc(doc(db, 'lists', created.id, 'items', itemId), {
       name: 'Milk',
       state: false,
       description: '',
-      date: Date.now(),
+      date: itemDate,
       listCreatedAt: createdAt,
+      category: 'Other',
+      by: OWNER,
     });
 
     const items = await getDocs(
@@ -61,14 +66,57 @@ test('the TodoListService payloads and queries are allowed end to end', async ()
     assert.equal(items.size, 1);
 
     await updateDoc(doc(db, 'lists', created.id), { name: 'Fruit' });
+    await updateDoc(doc(db, 'lists', created.id), { householdId: null, householdCreatedAt: null });
     await updateDoc(doc(db, 'lists', created.id, 'items', itemId), {
       name: 'Oat milk',
       state: true,
       description: '',
-      date: Date.now(),
+      date: itemDate, // edits keep the creation date (the rules require it)
     });
     await deleteDoc(doc(db, 'lists', created.id, 'items', itemId));
     await deleteDoc(doc(db, 'lists', created.id));
+  });
+});
+
+test('household lists: createList, the per-household query and setHousehold are allowed', async () => {
+  await withTestEnv(async (env) => {
+    const db = env.authenticatedContext(OWNER).firestore();
+    // HouseholdService.create's payload.
+    const created = await addDoc(collection(db, 'households'), {
+      ownerUid: OWNER,
+      name: 'Home',
+      date: Date.now(),
+      createdAt: serverTimestamp(),
+      memberUids: [OWNER],
+      joinedAt: { [OWNER]: serverTimestamp() },
+    });
+    const h = { id: created.id, createdAt: (await getDoc(created)).get('createdAt') };
+
+    const list = await addDoc(collection(db, 'lists'), {
+      ownerUid: OWNER,
+      name: 'Groceries',
+      date: Date.now(),
+      createdAt: serverTimestamp(),
+      memberUids: [OWNER],
+      joinedAt: { [OWNER]: serverTimestamp() },
+      householdId: h.id,
+      householdCreatedAt: h.createdAt,
+    });
+    const filed = () =>
+      getDocs(
+        query(
+          collection(db, 'lists'),
+          where('householdId', '==', h.id),
+          where('householdCreatedAt', '==', h.createdAt),
+        ),
+      );
+    assert.equal((await filed()).size, 1);
+
+    await updateDoc(list, { householdId: null, householdCreatedAt: null });
+    assert.equal((await filed()).size, 0);
+    await updateDoc(list, { householdId: h.id, householdCreatedAt: h.createdAt });
+    assert.equal((await filed()).size, 1);
+    await updateDoc(list, { name: 'Fruit' });
   });
 });
 
@@ -91,6 +139,7 @@ test('editing an item deleted elsewhere fails instead of recreating it', async (
       description: '',
       date: 1,
       listCreatedAt: createdAt,
+      by: OWNER,
     });
     await deleteDoc(itemRef);
 

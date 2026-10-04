@@ -7,6 +7,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -31,6 +32,7 @@ const ITEM = {
   description: '',
   date: 1000,
   listCreatedAt: T0,
+  by: OWNER,
 };
 
 async function seed(env: RulesTestEnvironment): Promise<void> {
@@ -102,13 +104,103 @@ test('an item bound to another list incarnation cannot be written', async () => 
   });
 });
 
-test('a read-only member cannot write an item', async () => {
+test('a member writes, edits and deletes an item', async () => {
   await withTestEnv(async (env) => {
     await seed(env);
     const db = env.authenticatedContext(MEMBER).firestore();
+    const ref = doc(db, 'lists/list-1/items/item-3');
+    await assertSucceeds(setDoc(ref, { ...ITEM, name: 'Bread', by: MEMBER }));
+    await assertSucceeds(updateDoc(doc(db, 'lists/list-1/items/item-1'), { state: true }));
+    await assertSucceeds(deleteDoc(ref));
+  });
+});
+
+test('a stranger cannot write an item', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const db = env.authenticatedContext(STRANGER).firestore();
     await assertFails(
-      setDoc(doc(db, 'lists/list-1/items/item-3'), { ...ITEM, name: 'Bread' }),
+      setDoc(doc(db, 'lists/list-1/items/item-3'), { ...ITEM, by: STRANGER }),
     );
+    await assertFails(updateDoc(doc(db, 'lists/list-1/items/item-1'), { state: true }));
+    await assertFails(deleteDoc(doc(db, 'lists/list-1/items/item-1')));
+  });
+});
+
+test('an item with every optional field is accepted', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'lists/list-1/items/item-6'), {
+        ...ITEM,
+        photoPath: 'lists/list-1/1_0/item-6/photo.jpg',
+        category: 'Dairy & Eggs',
+        remindAt: 5000,
+        reminded: false,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db, 'lists/list-1/items/item-6'), { remindAt: null, reminded: false }),
+    );
+  });
+});
+
+const BAD_ITEMS: Record<string, Record<string, unknown>> = {
+  'an unknown field': { admin: true },
+  'a numeric name': { name: 1 },
+  'a 501 character name': { name: 'x'.repeat(501) },
+  'a 5001 character description': { description: 'x'.repeat(5001) },
+  'a string state': { state: 'done' },
+  'a string date': { date: 'today' },
+  'a numeric category': { category: 3 },
+  'a 51 character category': { category: 'x'.repeat(51) },
+  'a numeric photoPath': { photoPath: 3 },
+  'a 301 character photoPath': { photoPath: 'x'.repeat(301) },
+  'a string remindAt': { remindAt: 'soon' },
+  'a string reminded': { reminded: 'no' },
+};
+
+for (const [what, extra] of Object.entries(BAD_ITEMS)) {
+  test(`an item with ${what} is rejected on create and update`, async () => {
+    await withTestEnv(async (env) => {
+      await seed(env);
+      const db = env.authenticatedContext(OWNER).firestore();
+      await assertFails(setDoc(doc(db, 'lists/list-1/items/item-7'), { ...ITEM, ...extra }));
+      await assertFails(updateDoc(doc(db, 'lists/list-1/items/item-1'), extra));
+    });
+  });
+}
+
+test('an item missing a required field is rejected', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const db = env.authenticatedContext(OWNER).firestore();
+    const { name: _name, ...withoutName } = ITEM;
+    await assertFails(setDoc(doc(db, 'lists/list-1/items/item-8'), withoutName));
+  });
+});
+
+test('a new item must name its creator as by', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const db = env.authenticatedContext(MEMBER).firestore();
+    const { by: _by, ...withoutBy } = ITEM;
+    await assertFails(setDoc(doc(db, 'lists/list-1/items/item-9'), withoutBy));
+    await assertFails(setDoc(doc(db, 'lists/list-1/items/item-9'), { ...ITEM, by: OWNER }));
+    await assertSucceeds(setDoc(doc(db, 'lists/list-1/items/item-9'), { ...ITEM, by: MEMBER }));
+  });
+});
+
+test('by cannot be changed or removed by an edit', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const db = env.authenticatedContext(MEMBER).firestore();
+    const ref = doc(db, 'lists/list-1/items/item-1');
+    await assertFails(updateDoc(ref, { by: MEMBER }));
+    await assertFails(updateDoc(ref, { by: deleteField() }));
+    await assertFails(setDoc(ref, { ...ITEM, by: MEMBER }));
+    await assertSucceeds(setDoc(ref, { ...ITEM, name: 'Butter' }));
   });
 });
 
@@ -184,5 +276,16 @@ test('recreating a deleted list id does not expose its orphaned items', async ()
       }),
     );
     await assertFails(getDoc(doc(stranger, 'lists/list-1/items/item-1')));
+  });
+});
+
+test("an edit keeps the item's creation date", async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const db = env.authenticatedContext(MEMBER).firestore();
+    const ref = doc(db, 'lists/list-1/items/item-1');
+    await assertSucceeds(updateDoc(ref, { name: 'Oat milk', date: ITEM.date }));
+    // A new date would make the notifier announce it again as the creator's new item.
+    await assertFails(updateDoc(ref, { name: 'Call me', date: ITEM.date + 1 }));
   });
 });

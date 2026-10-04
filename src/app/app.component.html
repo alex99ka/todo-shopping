@@ -3,7 +3,7 @@
     <ion-menu contentId="main-content" menuId="myMenu">
       <ion-header class="navigation-drawer">
         <div class="profil">
-          <img class="profil-img" [src]="profile.photoURL" alt="avatar" />
+          <img class="profil-img" [src]="profile.photoURL" alt="" referrerpolicy="no-referrer" />
           <p class="profil-text">
             <ion-text color="light">
               <b>{{ profile.displayName }}</b>
@@ -25,46 +25,49 @@
             <ion-icon
               slot="start"
               name="list-circle"
-              [color]="homeLink.isActive ? 'primary' : 'gray'"
+              aria-hidden="true"
+              [color]="homeLink.isActive ? 'primary' : 'medium'"
             ></ion-icon>
-            <ion-label [color]="homeLink.isActive ? 'primary' : 'gray'">My notes</ion-label>
+            <ion-label [color]="homeLink.isActive ? 'primary' : ''">My lists</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle>
           <ion-item
             button
             lines="none"
-            routerLink="/shared-with-me"
+            routerLink="/households"
             routerLinkActive="selected"
-            #sharedLink="routerLinkActive"
+            #householdsLink="routerLinkActive"
           >
             <ion-icon
               slot="start"
-              name="people"
-              [color]="sharedLink.isActive ? 'primary' : 'gray'"
+              name="home"
+              aria-hidden="true"
+              [color]="householdsLink.isActive ? 'primary' : 'medium'"
             ></ion-icon>
-            <ion-label [color]="sharedLink.isActive ? 'primary' : 'gray'">Shared with me</ion-label>
+            <ion-label [color]="householdsLink.isActive ? 'primary' : ''">Households</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle>
           <ion-item
             button
             lines="none"
-            routerLink="/share-my-notes"
+            routerLink="/settings"
             routerLinkActive="selected"
-            #shareLink="routerLinkActive"
+            #settingsLink="routerLinkActive"
           >
             <ion-icon
               slot="start"
-              name="share-social"
-              [color]="shareLink.isActive ? 'primary' : 'gray'"
+              name="settings"
+              aria-hidden="true"
+              [color]="settingsLink.isActive ? 'primary' : 'medium'"
             ></ion-icon>
-            <ion-label [color]="shareLink.isActive ? 'primary' : 'gray'">Share my notes</ion-label>
+            <ion-label [color]="settingsLink.isActive ? 'primary' : ''">Settings</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle>
           <ion-item button lines="none" (click)="confirmSignOut()">
-            <ion-icon slot="start" name="log-out"></ion-icon>
+            <ion-icon slot="start" name="log-out" aria-hidden="true"></ion-icon>
             <ion-label>Sign Out</ion-label>
           </ion-item>
         </ion-menu-toggle>

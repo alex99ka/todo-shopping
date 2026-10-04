@@ -1,96 +1,236 @@
-[![CI](https://github.com/hamzahamidi/todo-list/actions/workflows/ci.yml/badge.svg)](https://github.com/hamzahamidi/todo-list/actions/workflows/ci.yml)
-[![Deploy](https://github.com/hamzahamidi/todo-list/actions/workflows/deploy.yml/badge.svg)](https://github.com/hamzahamidi/todo-list/actions/workflows/deploy.yml)
-[![Release](https://github.com/hamzahamidi/todo-list/actions/workflows/release.yml/badge.svg)](https://github.com/hamzahamidi/todo-list/actions/workflows/release.yml)
-[![GitHub release](https://img.shields.io/github/release/hamzahamidi/todo-list.svg)](https://github.com/hamzahamidi/todo-list/releases/latest)
-[![GitHub license](https://img.shields.io/github/license/hamzahamidi/todo-list.svg)](https://github.com/hamzahamidi/todo-list)
+[![CI](https://github.com/alex99ka/todo-shopping/actions/workflows/ci.yml/badge.svg)](https://github.com/alex99ka/todo-shopping/actions/workflows/ci.yml)
+[![Release](https://github.com/alex99ka/todo-shopping/actions/workflows/release.yml/badge.svg)](https://github.com/alex99ka/todo-shopping/actions/workflows/release.yml)
+[![GitHub release](https://img.shields.io/github/release/alex99ka/todo-shopping.svg)](https://github.com/alex99ka/todo-shopping/releases/latest)
 
-# Todo List
+# Todo and Shopping
 
-A todo list app built with Ionic, Angular and Capacitor on Firebase. It runs on the web
-as an installable app, and every release ships an Android APK and an iOS IPA.
+Shared todo and shopping lists for a household, built with Ionic 9, Angular 22 and
+Capacitor 8 on Firebase. It runs on the web as an installable app (also on iPhone) and
+as an Android app.
 
-**Live at [hamidihamza.com/todo-list](https://hamidihamza.com/todo-list/).
-Downloads on the [releases page](https://github.com/hamzahamidi/todo-list/releases/latest).**
+**Live at [alex-todo-shopping.web.app](https://alex-todo-shopping.web.app).
+Android APK on the [releases page](https://github.com/alex99ka/todo-shopping/releases/latest).**
+
+Forked from [hamzahamidi/todo-list](https://github.com/hamzahamidi/todo-list) by Hamza
+Hamidi, MIT licensed. See [CHANGELOG.md](CHANGELOG.md) for what changed.
+
+## Features
 
 - Google sign-in.
-- Create, rename and delete lists.
-- Add, edit, complete and delete tasks.
-- Dictate a task by voice, in the native builds only.
+- Todo lists and shopping lists. Shopping items are grouped by grocery category and
+  checked off with one tap.
+- Households: every list in a household is shared with all its members.
+- Invite links for a list or a household, valid for 7 days.
+- Task reminders, and push notifications for new items on shared lists, due reminders and new versions.
+- Import from the recipe book: its "add to shopping list" link adds the ingredients.
+- Settings page with the version and an update check. Updates download in the
+  background and are offered with a prompt.
 
-Photos on tasks need Cloud Storage, which is not enabled on the Firebase project yet.
-Sharing lists is being rebuilt.
+Photo attachments are hidden: Cloud Storage needs the paid Blaze plan.
 
-## Stack
+## Architecture
 
-| | |
-|---|---|
-| UI | Ionic 9 (standalone components) |
-| Framework | Angular 22 |
-| Backend | Firebase Auth, Cloud Firestore and Cloud Storage (modular SDK with `rxfire`) |
-| Native | Capacitor 8 (Android and iOS) |
-| Build | Angular CLI |
+```
+Clients       Browser / iPhone home screen          Android app (Capacitor)
+                         |                                   |
+                         v                                   v
+Firebase      Auth (Google) . Firestore (firestore.rules) . Hosting . Cloud Messaging
+(Spark)                          ^                                         |
+                                 | Admin SDK                               v pushes
+Raspberry Pi  notifier/ (Docker): polls Firestore and GitHub, sends through FCM
+                                                    ^
+                                                    | releases/latest
+GitHub        Actions: ci.yml, release.yml --> Releases (APK, www.zip, SHA256SUMS)
+                          |                          |
+                          +--> deploys Hosting       +--> Android in-app updates
 
-# Getting started
+Recipe book   "add to shopping list" --> https://alex-todo-shopping.web.app/import#<json>
+```
 
-Requires Node.js 24 or newer. The tests also need Java 21 or newer for the Firebase
-emulators.
+- No server of our own: the clients talk to Firestore directly, and the security rules
+  are the backend.
+- The Spark plan has no Cloud Functions, so the [notifier](notifier/README.md) runs on
+  a Raspberry Pi. It polls Firestore with the Admin SDK and sends pushes through
+  Firebase Cloud Messaging: new items in a list, due reminders and new releases.
+- Updates: the web app updates through the Angular service worker. The Android app
+  downloads `www.zip` from the latest GitHub release, checks it against GitHub's
+  SHA-256 digest and applies it on the next start (`@capgo/capacitor-updater` without
+  Capgo's cloud). When the MAJOR version differs it offers the new APK instead.
+- The recipe book integration is described in
+  [docs/recipe-book-integration.md](docs/recipe-book-integration.md).
+
+## Cost
+
+Everything runs on free tiers. The limits that matter:
+
+| Service | Free limit | What uses it |
+|---|---|---|
+| Firestore | 50,000 reads, 20,000 writes, 20,000 deletes a day; 1 GiB stored | The apps, and the notifier's polling. A query costs at least one read even when nothing changed, so `POLL_SECONDS` (30 s, 2,880 polls a day) sets the floor. |
+| Hosting | 10 GB stored, 360 MB transfer a day | Each deploy is kept as a release; cap the retained releases in the Hosting console if storage grows. |
+| Auth, Cloud Messaging | Free | Google sign-in, pushes. |
+| GitHub Actions and Releases | Free for a public repository | CI, release builds, APK and `www.zip` downloads. |
+| GitHub API | 60 unauthenticated requests an hour per IP | The Android app's update check, at start and at most every 6 hours. |
+| Raspberry Pi | Electricity | The notifier. |
+
+Over a Spark limit, Firebase stops serving that product until the quota resets; the
+Spark plan never bills.
+
+## Security
+
+- **Firestore rules** (`firestore.rules`) are the access boundary. A list and its
+  items are visible to the list's members and to the members of its household; they
+  edit the items, and only the owner renames or deletes the list. A user joins only
+  through an unexpired invite for that exact list or household, adds only
+  themselves, and records that invite under their own uid — so knowing a list or
+  household id is never enough. Lists are bound to their household's `createdAt`,
+  so a household deleted and recreated under the same id does not inherit them. `notifier/state` and anything else not matched is denied. `npm run
+  test:rules` checks every allow and deny path in the emulator, and `npm run
+  test:services` replays the services' real queries and writes under those rules.
+- **Invites**: the random invite id is the secret. It can be read by id but invites
+  cannot be listed, and the rules reject a join more than 7 days after the invite was
+  created.
+- **Service accounts** each get one job and the least privilege for it: the notifier's
+  account on the Pi (see [notifier/README.md](notifier/README.md)) and the Hosting
+  deploy account in GitHub (Firebase Hosting Admin only). Their JSON keys never enter
+  the repository: they are kept in `~/.keystores` on the maintainer's PC (and the
+  notifier's copy on the Pi), and `notifier/.gitignore` blocks `service-account.json`
+  as a backstop.
+- **Release signing**: the Android keystore is a GitHub secret for CI, with the offline
+  copy and its password in `~/.keystores` (back these up: a lost key means users must
+  uninstall to update). It is
+  decoded in a separate job that runs no npm or Gradle code, and deleted after use.
+  Every workflow job gets only the `GITHUB_TOKEN` permissions it needs.
+- **Updates**: Android applies a `www.zip` only if it matches the SHA-256 digest
+  GitHub reports for the release asset, and native code only changes through an APK
+  signed with the release key.
+- **No secrets in the repository.** The Firebase web config in `src/environments/` and
+  `google-services.json` identify the project and are public by design.
+- **Profiles are private**: `users/{uid}` is readable only by that user; the notifier
+  reads names through the Admin SDK. An item's `date` cannot change after creation, so
+  a member cannot make the notifier re-announce someone else's item. An invite only
+  works while its creator can still use the target, and leaving a household un-files
+  your own lists from it.
+
+Known limits, accepted for a family app:
+
+- The owner cannot remove a member from a list or household; members leave
+  themselves, or the owner deletes and recreates it.
+- An invite is not bound to its target's incarnation: if a list or household is
+  deleted and someone recreates the same id within 7 days, a pending invite joins the
+  new one.
+- The Android web bundle is checked against GitHub's SHA-256 digest, not a key of our
+  own, so anyone able to publish releases on the GitHub repo can ship an update. Keep
+  the GitHub account behind 2FA.
+- The rules cannot rate-limit: any Google account can sign in and use quota.
+
+## Local development
+
+Requires Node.js 24. The tests also need Java 21 for the Firebase emulators.
 
 ```
 npm install
 npm start
 ```
 
-Navigate to `http://localhost:4200/`. The app reloads automatically when you change
-a source file.
+Open `http://localhost:4200/`. `npm run build` writes the production build to `www/`,
+and `npm run lint` checks the sources.
 
-# Building the project
-
-```
-npm run build
-```
-
-Build artifacts are written to `www/`.
-
-Run `npm run lint` to check the sources.
-
-# Testing
-
-The Firestore and Cloud Storage security rules live in `firestore.rules` and
-`storage.rules`, and are tested against the Firebase emulators:
+## Tests
 
 ```
 npm run test:rules
 npm run test:services
 ```
 
-`test:rules` checks every allow and deny path. `test:services` replays the
-services' exact queries and writes as a signed in user under those rules.
+Both run against the Firestore emulator. CI ([`ci.yml`](.github/workflows/ci.yml))
+runs lint, build and both test suites on every push to `master` and every pull request.
 
-# Deployment
+## Versioning
 
-Pushing to `master` runs [`deploy.yml`](.github/workflows/deploy.yml), which builds the
-app and publishes it to GitHub Pages. The Pages source is set to GitHub Actions, so no
-branch holds the built output.
+[Semantic Versioning](https://semver.org). `package.json` holds the version, the app
+shows it in Settings, and the release tag must equal it.
 
-The build is served from a subdirectory, so it is built with `--base-href /todo-list/`.
-`index.html` is copied to `404.html` because GitHub Pages has no rewrite rule and the
-router needs every path to reach the app shell.
+- **MAJOR**: native change, such as a Capacitor plugin added or upgraded, or an
+  Android setting or permission. Android users must install the new APK; the app
+  prompts them to download it.
+- **MINOR**: new features in the web layer.
+- **PATCH**: fixes in the web layer.
 
-The security rules are not part of that workflow. They deploy to the Firebase project
-named in `.firebaserc` with:
+MINOR and PATCH releases reach installed Android apps as `www.zip`, so they must not
+need native code that the installed APK lacks. The Android `versionCode` is
+`MAJOR * 1000000 + MINOR * 1000 + PATCH`.
+
+## Releasing
+
+Move the `Unreleased` notes in [CHANGELOG.md](CHANGELOG.md) under the new version,
+commit, then:
 
 ```
-npx firebase deploy --only firestore,storage
+npm version minor        # or patch, or major
+git push --atomic --follow-tags origin master
 ```
 
-# Native builds
+`.npmrc` makes `npm version` create bare tags such as `1.1.0`. The tag runs
+[`release.yml`](.github/workflows/release.yml):
 
-The native shells use [Capacitor](https://capacitorjs.com). `android/` and `ios/` are
-generated and are not checked in. The scripts in `scripts/native/` apply the native
-settings to a fresh project: the Android version numbers, the Google sign-in flag, the
-Firebase config file, the iOS permission texts, the launcher icons from
-`resources/icon.png` and the splash screens from `resources/splash.png` (light) and
-`resources/icon.png` (dark). The release workflow sets the iOS version when it archives.
+1. Checks that the tag equals the `package.json` version.
+2. Builds and signs the APK, and builds the web bundle into `www.zip`.
+3. Publishes a GitHub release with `todo-shopping-<version>.apk`, `www.zip` and
+   `SHA256SUMS`. Installed apps pick it up from here.
+4. Deploys the same bundle to Firebase Hosting, unless a newer release exists.
+
+Firestore rules and indexes are not part of the release. If a release needs new rules,
+deploy them first (see below).
+
+The workflow needs these repository settings:
+
+| Name | Kind | Value |
+|---|---|---|
+| `ANDROID_KEYSTORE_BASE64` | secret | The release keystore (PKCS12), base64 encoded |
+| `ANDROID_KEYSTORE_PASSWORD` | secret | Its password |
+| `ANDROID_KEY_ALIAS` | variable | The key alias |
+| `FIREBASE_SERVICE_ACCOUNT` | secret | JSON key of the Hosting deploy service account |
+
+Every release must be signed with the same key, or installed copies cannot update.
+To rebuild a release without moving its tag, run
+`gh workflow run release.yml --ref 1.1.0 -f publish=true`. A run from a branch builds
+the files as workflow artifacts and publishes nothing.
+
+## Installing on Android
+
+1. On the phone, open the
+   [latest release](https://github.com/alex99ka/todo-shopping/releases/latest) and
+   download `todo-shopping-<version>.apk`.
+2. Open it. Android asks to allow your browser to install unknown apps; allow it
+   (Settings > Apps > Special app access > Install unknown apps).
+3. Install, sign in, and allow notifications when asked.
+
+Later versions arrive inside the app. A MAJOR version asks you to download the new APK,
+which installs over the old one.
+
+On an iPhone, open the live site in Safari and use Share > Add to Home Screen.
+
+## First-time Firebase setup
+
+1. In the Firebase console for `alex-todo-shopping`, enable the **Google** provider
+   under Authentication > Sign-in method.
+2. Deploy the rules and indexes:
+   ```
+   npx firebase deploy --only firestore
+   ```
+3. Register the Android app `com.alex99ka.todoshop`, add the release key's SHA-1 and
+   SHA-256 fingerprints (and your debug key's SHA-1 for local native builds), and save
+   its `google-services.json` at the repository root.
+4. Create the Hosting deploy service account with the Firebase Hosting Admin role and
+   store its JSON key as the `FIREBASE_SERVICE_ACCOUNT` secret.
+5. Set up the notifier: [notifier/README.md](notifier/README.md).
+
+## Native build
+
+`android/` is generated and not checked in. `scripts/native/configure-android.sh`
+applies the native settings to a fresh project: the version numbers, the Google
+sign-in flag, `google-services.json` (checked against `.firebaserc` and the app id in
+`capacitor.config.ts`), and the icons and splash screens from `resources/`.
 
 Android needs JDK 21, the Android SDK and jq:
 
@@ -103,48 +243,6 @@ npx cap sync android
 npx cap open android
 ```
 
-iOS needs macOS with Xcode 26, CocoaPods, and the xcodeproj gem for the `ruby` on
-`PATH`:
+## License
 
-```
-npm ci
-npx cap add ios --packagemanager CocoaPods
-scripts/native/configure-ios.sh
-npm run build
-npx cap sync ios
-npx cap open ios
-```
-
-`google-services.json` belongs to the Firebase Android app `com.todo.list` on
-`todo-list-f5305`, which has the release key's SHA-1 and SHA-256 registered. A local
-debug build is signed with another key, so native Google sign-in needs that key's SHA-1
-added in the Firebase console too. No Firebase iOS app exists yet, and Google is the
-only sign-in method, so the iOS build cannot sign in.
-
-# Releases
-
-Pushing a `MAJOR.MINOR.PATCH` tag runs [`release.yml`](.github/workflows/release.yml).
-It builds a signed APK on Ubuntu and an unsigned IPA on macOS, then publishes a GitHub
-release with both files and a `SHA256SUMS` file. The tag must equal the `package.json`
-version:
-
-```
-npm version patch
-git push --atomic --follow-tags origin master
-```
-
-`.npmrc` makes `npm version` create bare tags such as `1.0.1`, like the older tags.
-
-The APK is signed with the release key stored in the `ANDROID_KEYSTORE_BASE64` and
-`ANDROID_KEYSTORE_PASSWORD` secrets, under the alias in the `ANDROID_KEY_ALIAS`
-repository variable. Every release must use that key, or installed copies cannot update. The IPA is unsigned: install it with a
-sideloading tool that re-signs it, such as AltStore or Sideloadly.
-
-To rebuild a release without moving its tag, run
-`gh workflow run release.yml --ref 1.0.1 -f publish=true`. A run from a branch builds
-both files as workflow artifacts and publishes nothing.
-
-# Project Planning
-
-We use [ZenHub](https://zenhub.com) for project planning. The pipelines and milestones
-live on the [ZenHub project page](https://app.zenhub.com/workspace/o/hamzahamidi/todo-list/).
+[MIT](LICENSE.md). Original work copyright (c) 2018 Hamza Hamidi.

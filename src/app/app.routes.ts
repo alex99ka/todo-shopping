@@ -19,22 +19,25 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/details/details.page').then((m) => m.DetailsPage),
   },
   {
-    path: 'share-my-notes',
+    path: 'households',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/share-my-notes/share-my-notes.page').then((m) => m.ShareMyNotesPage),
+    loadComponent: () => import('./pages/households/households.page').then((m) => m.HouseholdsPage),
   },
   {
-    path: 'share-my-notes/:listId',
+    path: 'settings',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/share-my-notes/share-my-notes.page').then((m) => m.ShareMyNotesPage),
+    loadComponent: () => import('./pages/settings/settings.page').then((m) => m.SettingsPage),
   },
   {
-    path: 'shared-with-me',
+    path: 'join/:inviteId',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/shared-with-me/shared-with-me.page').then((m) => m.SharedWithMePage),
+    loadComponent: () => import('./pages/join/join.page').then((m) => m.JoinPage),
+  },
+  {
+    // The recipe book's "add to shopping list" button lands here.
+    path: 'import',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/import/import.page').then((m) => m.ImportPage),
   },
   { path: '**', redirectTo: 'home' },
 ];

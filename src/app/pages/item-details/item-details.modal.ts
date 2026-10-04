@@ -19,6 +19,8 @@ import {
   IonInput,
   IonItem,
   IonRow,
+  IonSelect,
+  IonSelectOption,
   IonTextarea,
   IonTitle,
   IonToolbar,
@@ -28,7 +30,7 @@ import type { Timestamp } from 'firebase/firestore';
 import { addIcons } from 'ionicons';
 import { camera, close, image as imageIcon, mic } from 'ionicons/icons';
 import { PhotoService, TodoListService } from '../../core';
-import { Item, ItemChanges, newItem } from '../../models';
+import { CATEGORIES, Item, ItemChanges, newItem } from '../../models';
 import { AlertService, MediaService, SpeechService } from '../../shared';
 
 type VoiceField = 'name' | 'description';
@@ -50,6 +52,8 @@ type VoiceField = 'name' | 'description';
     IonInput,
     IonItem,
     IonRow,
+    IonSelect,
+    IonSelectOption,
     IonTextarea,
     IonTitle,
     IonToolbar,
@@ -60,6 +64,12 @@ export class ItemDetailsModalComponent implements OnInit {
   listId = '';
   listCreatedAt?: Timestamp;
   item?: Item;
+  shopping = false;
+
+  protected readonly categories = CATEGORIES;
+  protected readonly category = signal('Other');
+  /** 'YYYY-MM-DDTHH:mm' in local time, as <input type="datetime-local"> wants it. */
+  protected readonly remindAt = signal('');
 
   protected readonly name = signal('');
   protected readonly description = signal('');
@@ -93,6 +103,8 @@ export class ItemDetailsModalComponent implements OnInit {
     this.name.set(seed.name);
     this.description.set(seed.description);
     this.state.set(seed.state);
+    this.category.set(this.item?.category ?? 'Other');
+    this.remindAt.set(this.item?.remindAt ? toLocalInput(this.item.remindAt) : '');
     this.date = seed.date;
     this.itemId = this.item?.id ?? this.todoLists.newItemId(this.listId);
     const path = this.item?.photoPath;
@@ -102,12 +114,12 @@ export class ItemDetailsModalComponent implements OnInit {
   }
 
   protected async addItem(): Promise<void> {
-    await this.save(null, 'Note succesfuly added');
+    await this.save(null, this.shopping ? 'Added' : 'Task added');
   }
 
   protected async updateItem(): Promise<void> {
     if (this.item) {
-      await this.save(this.item, 'Note succesfuly updated');
+      await this.save(this.item, 'Saved');
     }
   }
 
@@ -156,8 +168,20 @@ export class ItemDetailsModalComponent implements OnInit {
       name: this.name(),
       state: this.state(),
       description: this.description(),
-      date: this.date,
+      // A new item is dated when saved, not when this editor opened: the notifier
+      // finds new items by date, so a stale one could slip under its cursor.
+      date: existing ? this.date : Date.now(),
+      ...(this.shopping && { category: this.category() }),
     };
+    if (!this.shopping) {
+      const at = this.remindAt() ? new Date(this.remindAt()).getTime() : null;
+      // Only touch the reminder when it changed, so editing the text of an item
+      // whose reminder already fired does not fire it again.
+      if (at !== (existing?.remindAt ?? null)) {
+        changes.remindAt = at;
+        changes.reminded = false;
+      }
+    }
     const pending = this.pendingPhoto();
     let uploaded: string | undefined;
     try {
@@ -183,4 +207,9 @@ export class ItemDetailsModalComponent implements OnInit {
     await this.alert.presentToast(successToast);
     await this.dismiss(true);
   }
+}
+
+function toLocalInput(ms: number): string {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60_000);
+  return d.toISOString().slice(0, 16);
 }

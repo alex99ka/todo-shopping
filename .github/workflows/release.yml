@@ -11,8 +11,7 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: release-${{ github.ref }}
@@ -21,6 +20,8 @@ concurrency:
 jobs:
   version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       code: ${{ steps.version.outputs.code }}
@@ -74,6 +75,8 @@ jobs:
   android:
     needs: version
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 45
     env:
       VERSION: ${{ needs.version.outputs.version }}
@@ -136,9 +139,9 @@ jobs:
           # A PKCS12 keystore has one password for the store and the key.
           "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
             --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEYSTORE_PASSWORD \
-            --out "out/todo-list-$LABEL.apk" "$RUNNER_TEMP/aligned.apk"
+            --out "out/todo-shopping-$LABEL.apk" "$RUNNER_TEMP/aligned.apk"
           rm -f "$keystore"
-          "$tools/apksigner" verify --verbose --print-certs "out/todo-list-$LABEL.apk"
+          "$tools/apksigner" verify --verbose --print-certs "out/todo-shopping-$LABEL.apk"
       - uses: actions/upload-artifact@v7
         with:
           name: release-android
@@ -146,14 +149,13 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  ios:
+  # The web bundle the hosted app and the Android live update both run.
+  web:
     needs: version
-    runs-on: macos-26
-    timeout-minutes: 60
-    env:
-      VERSION: ${{ needs.version.outputs.version }}
-      VERSION_CODE: ${{ needs.version.outputs.code }}
-      LABEL: ${{ needs.version.outputs.label }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -162,36 +164,24 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: xcodebuild -version && pod --version
       - run: npm ci
-      - run: npx cap add ios --packagemanager CocoaPods
-      - run: scripts/native/configure-ios.sh
       - run: npm run build
-      - run: npx cap sync ios
-      - name: Archive without signing
+      # The updater wants index.html at the zip root and no hidden files.
+      - name: Zip the web bundle
+        working-directory: www
         run: |
-          xcodebuild -quiet -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
-            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            ENABLE_USER_SCRIPT_SANDBOXING=NO \
-            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION_CODE" \
-            archive
-      - name: Package the IPA
-        run: |
-          app="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
-          plutil -p "$app/Info.plist" | grep -E 'CFBundleIdentifier|CFBundleShortVersionString|CFBundleVersion'
-          mkdir -p "$RUNNER_TEMP/ipa/Payload" out
-          cp -R "$app" "$RUNNER_TEMP/ipa/Payload/"
-          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/out/todo-list-$LABEL-unsigned.ipa" Payload)
+          mkdir -p ../out
+          zip -qr ../out/www.zip . -x '.*' '*/.*'
+          unzip -l ../out/www.zip index.html
       - uses: actions/upload-artifact@v7
         with:
-          name: release-ios
-          path: out/*.ipa
+          name: release-web
+          path: out/www.zip
           if-no-files-found: error
           retention-days: 14
 
   release:
-    needs: [version, android-sign, ios]
+    needs: [version, android-sign, web]
     if: needs.version.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -209,7 +199,7 @@ jobs:
       - name: Publish
         working-directory: dist
         run: |
-          files=("todo-list-$TAG.apk" "todo-list-$TAG-unsigned.ipa")
+          files=("todo-shopping-$TAG.apk" www.zip)
           sha256sum "${files[@]}" > SHA256SUMS
           files+=(SHA256SUMS)
           if gh release view "$TAG" > /dev/null 2>&1; then
@@ -220,8 +210,55 @@ jobs:
             fi
           else
             notes=$(printf '%s\n\n' \
-              "**Android**: install todo-list-$TAG.apk. Every release is signed with the same key, so it updates an earlier install in place." \
-              "**iOS**: todo-list-$TAG-unsigned.ipa is not signed, so re-sign it with a sideloading tool such as AltStore or Sideloadly before installing. It cannot sign in yet: Google is the only sign-in method and no Firebase iOS app is configured." \
+              "**Android**: install todo-shopping-$TAG.apk. Every release is signed with the same key, so it updates an earlier install in place. An installed app downloads www.zip by itself, so only a new MAJOR version needs the APK." \
+              "**Web and iPhone**: open https://alex-todo-shopping.web.app. On an iPhone, add it to the Home Screen from Safari's Share menu." \
               "Check a download with: sha256sum -c --ignore-missing SHA256SUMS")
             gh release create "$TAG" "${files[@]}" --verify-tag --title "$TAG" --generate-notes --notes "$notes"
           fi
+
+  # Runs after the release so the web app never gets ahead of the Android bundle,
+  # and installs no project dependencies so no npm code shares a runner with the deploy key.
+  hosting:
+    needs: [version, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: hosting
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.version.outputs.version }}
+    steps:
+      # firebase.json holds the hosting config.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-web
+          path: ${{ runner.temp }}/web
+      - name: Deploy to Firebase Hosting
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          # Republishing an older tag must not roll the web app back.
+          latest=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name)
+          if [ "$latest" != "$TAG" ]; then
+            echo "::notice::$TAG is not the latest release ($latest), so hosting stays as it is"
+            exit 0
+          fi
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::the FIREBASE_SERVICE_ACCOUNT secret is required"
+            exit 1
+          fi
+          rm -rf www
+          unzip -q "$RUNNER_TEMP/web/www.zip" -d www
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
+          trap 'rm -f "$GOOGLE_APPLICATION_CREDENTIALS"' EXIT
+          (umask 077 && printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$GOOGLE_APPLICATION_CREDENTIALS")
+          npx --yes firebase-tools@15.15.0 deploy --only hosting --project alex-todo-shopping --non-interactive

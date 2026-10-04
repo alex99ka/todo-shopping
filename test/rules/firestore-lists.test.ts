@@ -315,13 +315,14 @@ test('a user writes only their own profile', async () => {
   });
 });
 
-test('a signed in user reads one profile but cannot list them all', async () => {
+test('a user reads only their own profile', async () => {
   await withTestEnv(async (env) => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users/member-uid'), { uid: MEMBER, email: 'x@y.z' });
     });
+    await assertSucceeds(getDoc(doc(env.authenticatedContext(MEMBER).firestore(), 'users/member-uid')));
     const db = env.authenticatedContext(STRANGER).firestore();
-    await assertSucceeds(getDoc(doc(db, 'users/member-uid')));
+    await assertFails(getDoc(doc(db, 'users/member-uid')));
     await assertFails(getDocs(collection(db, 'users')));
   });
 });

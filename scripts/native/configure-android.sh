@@ -35,5 +35,17 @@ cp google-services.json android/app/google-services.json
 
 npx --yes @capacitor/assets@3.0.5 generate --android --androidProject android \
   --assetPath resources \
-  --iconBackgroundColor '#e91e63' --iconBackgroundColorDark '#e91e63' \
-  --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#111111'
+  --iconBackgroundColor '#047857' --iconBackgroundColorDark '#047857' \
+  --splashBackgroundColor '#f3faf7' --splashBackgroundColorDark '#0b1512'
+
+# Push notifications need a white-on-transparent status bar icon; without one
+# Android shows the launcher icon as a white square.
+res=android/app/src/main/res
+mkdir -p "$res/drawable" "$res/values"
+cp resources/android/ic_stat_notify.xml "$res/drawable/"
+cp resources/android/notify_colors.xml "$res/values/"
+manifest=android/app/src/main/AndroidManifest.xml
+meta='<meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_notify" /><meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/notify_accent" />'
+sed -i.orig "s|</application>|${meta}</application>|" "$manifest"
+rm "$manifest.orig"
+grep -q 'default_notification_icon' "$manifest"

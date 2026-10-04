@@ -3,13 +3,15 @@
 export const environment = {
   production: true,
   firebase: {
-    apiKey: 'AIzaSyBwH6e_ae0cw-39GDeT1muzUhc18fqgK6Y',
-    authDomain: 'todo-list-f5305.firebaseapp.com',
-    projectId: 'todo-list-f5305',
-    storageBucket: 'todo-list-f5305.firebasestorage.app',
-    messagingSenderId: '176601468063',
-    appId: '1:176601468063:web:7b3fabef124c5a00bde6aa',
+    apiKey: 'AIzaSyANlSA4Gsum9NHYrf6JoQ33OETsGERulG4',
+    authDomain: 'alex-todo-shopping.firebaseapp.com',
+    projectId: 'alex-todo-shopping',
+    storageBucket: 'alex-todo-shopping.firebasestorage.app',
+    messagingSenderId: '835092070723',
+    appId: '1:835092070723:web:b0f8cd9cd201fe87ad6ff6',
   },
-  googleWebClientId:
-    '176601468063-bq9pk3g7gs7991j8i16b38pt837v160r.apps.googleusercontent.com',
+  /** Where invite links point, also from inside the Android app. */
+  appUrl: 'https://alex-todo-shopping.web.app',
+  /** Releases here carry the signed APK and the web bundle for in-app updates. */
+  githubRepo: 'alex99ka/todo-shopping',
 };

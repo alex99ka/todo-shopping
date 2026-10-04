@@ -11,7 +11,6 @@ export class AlertService {
     const toast = await this.toastCtrl.create({
       message,
       duration: 3000,
-      cssClass: 'text-center',
     });
     await toast.present();
   }

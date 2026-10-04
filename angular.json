@@ -39,9 +39,16 @@
                 "glob": "manifest.webmanifest",
                 "input": "src",
                 "output": ""
+              },
+              {
+                "glob": "firebase-messaging-sw.js",
+                "input": "src",
+                "output": ""
               }
             ],
             "styles": [
+              "node_modules/@fontsource-variable/rubik/index.css",
+              "node_modules/@fontsource-variable/nunito-sans/index.css",
               "node_modules/@ionic/angular/css/core.css",
               "node_modules/@ionic/angular/css/normalize.css",
               "node_modules/@ionic/angular/css/structure.css",
@@ -54,10 +61,7 @@
               "node_modules/@ionic/angular/css/flex-utils.css",
               "src/global.scss"
             ],
-            "scripts": [],
-            "allowedCommonJsDependencies": [
-              "qrcode"
-            ]
+            "scripts": []
           },
           "configurations": {
             "production": {
@@ -73,7 +77,16 @@
                   "maximumError": "16kb"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "serviceWorker": "ngsw-config.json",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": true
+              }
             },
             "development": {
               "optimization": false,

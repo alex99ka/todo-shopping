@@ -1,9 +1,9 @@
 <ion-header>
   <ion-toolbar color="primary">
-    <ion-title>Task Details</ion-title>
+    <ion-title>{{ item ? 'Edit' : shopping ? 'Add item' : 'New task' }}</ion-title>
     <ion-buttons slot="end">
-      <ion-button (click)="dismiss(false)">
-        <ion-icon slot="icon-only" name="close"></ion-icon>
+      <ion-button aria-label="Close" (click)="dismiss(false)">
+        <ion-icon slot="icon-only" name="close" aria-hidden="true"></ion-icon>
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
@@ -11,51 +11,80 @@
 
 <ion-content class="ion-padding">
   <ion-item>
-    <ion-input label="Task Name" labelPlacement="floating" type="text" [(ngModel)]="name"></ion-input>
-    <ion-button slot="end" size="large" fill="clear" color="dark" (click)="inputVoice('name')">
-      <ion-icon slot="icon-only" name="mic"></ion-icon>
+    <ion-input
+      [label]="shopping ? 'Item' : 'Task'"
+      labelPlacement="stacked"
+      type="text"
+      maxlength="500"
+      [(ngModel)]="name"
+    ></ion-input>
+    <ion-button slot="end" size="large" fill="clear" color="medium" aria-label="Dictate" (click)="inputVoice('name')">
+      <ion-icon slot="icon-only" name="mic" aria-hidden="true"></ion-icon>
     </ion-button>
   </ion-item>
 
   <ion-item>
-    <ion-textarea label="Description" labelPlacement="floating" [(ngModel)]="description"></ion-textarea>
-    <ion-button slot="end" size="large" fill="clear" color="dark" (click)="inputVoice('description')">
-      <ion-icon slot="icon-only" name="mic"></ion-icon>
+    <ion-textarea
+      [label]="shopping ? 'Amount / notes' : 'Notes'"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      maxlength="5000"
+      [(ngModel)]="description"
+    ></ion-textarea>
+    <ion-button slot="end" size="large" fill="clear" color="medium" aria-label="Dictate" (click)="inputVoice('description')">
+      <ion-icon slot="icon-only" name="mic" aria-hidden="true"></ion-icon>
     </ion-button>
   </ion-item>
 
-  <ion-row class="ion-padding-vertical">
-    <ion-col>
-      <ion-button expand="block" fill="clear" color="dark" (click)="takePicture()">
-        take Picture
-        <ion-icon slot="end" name="camera"></ion-icon>
-      </ion-button>
-    </ion-col>
-    <ion-col>
-      <ion-button expand="block" fill="clear" color="dark" (click)="pickFromLibrary()">
-        <ion-icon slot="start" name="image"></ion-icon>
-        from Library
-      </ion-button>
-    </ion-col>
-  </ion-row>
+  @if (!shopping) {
+    <ion-item>
+      <ion-input
+        label="Remind me"
+        labelPlacement="stacked"
+        type="datetime-local"
+        helperText="Sent as a notification to everyone on this list"
+        [(ngModel)]="remindAt"
+      ></ion-input>
+      @if (remindAt()) {
+        <ion-button slot="end" fill="clear" color="medium" aria-label="Remove reminder" (click)="remindAt.set('')">
+          <ion-icon slot="icon-only" name="close" aria-hidden="true"></ion-icon>
+        </ion-button>
+      }
+    </ion-item>
+  }
+
+  @if (shopping) {
+    <ion-item>
+      <ion-select label="Aisle" labelPlacement="stacked" interface="action-sheet" [(ngModel)]="category">
+        @for (c of categories; track c) {
+          <ion-select-option [value]="c">{{ c }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+  }
+
+  <!-- ponytail: photo buttons removed; Cloud Storage needs the paid Blaze plan.
+       Restore takePicture()/pickFromLibrary() buttons from upstream if you upgrade. -->
 
   @if (image()) {
     <img class="preview" [src]="image()" alt="" />
   }
 
-  <ion-item class="ion-padding">
-    <ion-checkbox [(ngModel)]="state">Finished</ion-checkbox>
+  <ion-item lines="none">
+    <ion-checkbox justify="start" labelPlacement="end" [(ngModel)]="state">
+      {{ shopping ? 'In the basket' : 'Done' }}
+    </ion-checkbox>
   </ion-item>
 
-  <ion-row>
+  <ion-row class="ion-padding-top">
     <ion-col>
-      <ion-button color="danger" expand="block" (click)="dismiss(false)">cancel</ion-button>
+      <ion-button fill="outline" color="medium" expand="block" (click)="dismiss(false)">Cancel</ion-button>
     </ion-col>
     <ion-col>
       @if (item) {
-        <ion-button color="warning" expand="block" (click)="updateItem()">Update Task</ion-button>
+        <ion-button expand="block" [disabled]="!name().trim()" (click)="updateItem()">Save</ion-button>
       } @else {
-        <ion-button expand="block" (click)="addItem()">Add Task</ion-button>
+        <ion-button expand="block" [disabled]="!name().trim()" (click)="addItem()">Add</ion-button>
       }
     </ion-col>
   </ion-row>

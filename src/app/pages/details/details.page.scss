@@ -1,0 +1,53 @@
+.summary {
+  margin: 16px 20px 0;
+  font-family: var(--app-font-heading);
+  font-weight: 500;
+  color: var(--ion-color-medium-shade);
+}
+
+.aisle {
+  margin-top: 8px;
+  font-family: var(--app-font-heading);
+  letter-spacing: 0.02em;
+  color: var(--ion-color-primary-shade);
+}
+
+ion-item {
+  --min-height: 56px;
+  transition: opacity 150ms ease;
+}
+
+ion-checkbox {
+  // A 44px hit area around the 24px box, without moving the layout.
+  padding: 10px;
+  margin: -10px 6px -10px -10px;
+}
+
+ion-label {
+  cursor: pointer;
+}
+
+.done {
+  opacity: 0.55;
+
+  h2 {
+    text-decoration: line-through;
+  }
+}
+
+.reminder {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--app-accent-ink) !important;
+}
+
+ion-list:last-of-type {
+  margin-bottom: 96px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ion-item {
+    transition: none;
+  }
+}

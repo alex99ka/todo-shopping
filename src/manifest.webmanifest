@@ -1,18 +1,24 @@
 {
-  "name": "Todo List",
-  "short_name": "Todo List",
-  "description": "Keep todo lists and tasks in sync across the web, Android and iOS, signed in with Google.",
-  "start_url": ".",
-  "scope": ".",
+  "name": "Todo and Shopping",
+  "short_name": "Lists",
+  "description": "Shared to-do lists and a shopping list sorted by aisle, synced across your household.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "icons": [
     {
       "src": "assets/imgs/logo.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "assets/imgs/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "background_color": "#E91E63",
-  "theme_color": "#E91E63"
+  "background_color": "#f3faf7",
+  "theme_color": "#047857"
 }

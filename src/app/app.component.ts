@@ -17,8 +17,8 @@ import {
   IonText,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { listCircle, logOut, people, shareSocial } from 'ionicons/icons';
-import { AuthService } from './core';
+import { home, listCircle, logOut, settings } from 'ionicons/icons';
+import { AuthService, PushService, UpdateService } from './core';
 import { AlertService } from './shared';
 import { CustomAlert } from './models';
 
@@ -46,18 +46,26 @@ export class AppComponent {
   private readonly auth = inject(AuthService);
   private readonly alert = inject(AlertService);
   private readonly router = inject(Router);
+  private readonly push = inject(PushService);
 
   protected readonly user = toSignal(this.auth.user$, { initialValue: null });
 
   constructor() {
-    addIcons({ listCircle, people, shareSocial, logOut });
+    addIcons({ listCircle, home, settings, logOut });
     void this.prepareNativeChrome();
+    inject(UpdateService).start();
+    // Re-register this device's push token whenever someone signs in.
+    this.auth.user$.subscribe((user) => {
+      if (user) {
+        void this.push.start().catch(() => undefined);
+      }
+    });
   }
 
   protected confirmSignOut(): void {
     const alert: CustomAlert = {
       title: 'Sign Out?',
-      message: 'You may lose all cached notes!',
+      message: 'This device will stop getting notifications for this account.',
       noText: 'Cancel',
       yesText: 'Yes',
       yesToastThen: 'Successfully signed out',
@@ -68,6 +76,7 @@ export class AppComponent {
   }
 
   private async signOut(): Promise<void> {
+    await this.push.forget();
     await this.auth.signOut();
     await this.router.navigate(['/auth']);
   }

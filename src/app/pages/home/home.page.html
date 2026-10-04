@@ -1,117 +1,81 @@
-<app-nav-bar
-  [title]="title"
-  [enabledChangeDisplay]="true"
-  (changeDisplayed)="toggleDisplay()"
-  (clickSearch)="toggleSearchBar()"
-></app-nav-bar>
+<app-nav-bar title="My lists" (clickSearch)="toggleSearchBar()"></app-nav-bar>
 
-<ion-content class="ion-padding">
-  <ion-searchbar
-    [class.ion-hide]="searchBarHidden()"
-    [ngModel]="search()"
-    (ngModelChange)="search.set($event)"
-  ></ion-searchbar>
+<ion-content>
+  @if (!searchBarHidden()) {
+    <ion-searchbar
+      placeholder="Search lists"
+      [ngModel]="search()"
+      (ngModelChange)="search.set($event)"
+    ></ion-searchbar>
+  }
 
-  @if (lists(); as todoLists) {
-    <ion-refresher slot="fixed" (ionRefresh)="refreshLists($event)">
-      <ion-refresher-content></ion-refresher-content>
-    </ion-refresher>
-
-    @if (todoLists.length === 0) {
-      <app-empty-list
-        icon="notifications"
-        h1Text="OMG!"
-        h3Text="You have no Lists."
-        h3TextSecond="Let's change that!"
-      ></app-empty-list>
-    }
-
-    @if (cardOrList()) {
-      <ion-list>
-        @for (todoList of todoLists; track todoList.id) {
+  @if (lists(); as all) {
+    @for (section of sections(); track section.id) {
+      <ion-list-header class="section-header">
+        <ion-icon [name]="section.icon" aria-hidden="true"></ion-icon>
+        <ion-label>{{ section.title }}</ion-label>
+      </ion-list-header>
+      <ion-list inset>
+        @for (todoList of section.lists; track todoList.id) {
           <ion-item-sliding>
-            <ion-item [button]="true" (click)="goToDetails(todoList)">
-              <ion-avatar slot="start">
-                <img [src]="avatarUrl(todoList.name)" [alt]="todoList.name" />
-              </ion-avatar>
-              <ion-row class="ion-justify-content-start">
-                <ion-col size="10">
-                  <h2>
-                    <b>{{ todoList.name }}</b>
-                  </h2>
-                </ion-col>
-                <ion-col class="ion-text-wrap">
-                  <ion-note> Created {{ todoList.date | dateCreated }} </ion-note>
-                </ion-col>
-              </ion-row>
+            <ion-item button detail (click)="goToDetails(todoList)">
+              <span class="monogram" [class.shopping]="isShopping(todoList)" slot="start" aria-hidden="true">
+                @if (isShopping(todoList)) {
+                  <ion-icon name="basket"></ion-icon>
+                } @else {
+                  {{ todoList.name.charAt(0).toUpperCase() }}
+                }
+              </span>
+              <ion-label>
+                <h2>{{ todoList.name }}</h2>
+                <p>Created {{ todoList.date | dateCreated }}</p>
+              </ion-label>
             </ion-item>
-            <ion-item-options side="start">
-              <ion-item-option color="warning" (click)="renameList(todoList)">
-                <ion-icon slot="start" name="create"></ion-icon>
-                Edit name
-              </ion-item-option>
-              <ion-item-option color="success" (click)="shareTodoList(todoList)">
-                <ion-icon slot="start" name="share"></ion-icon>
-                Share
-              </ion-item-option>
-            </ion-item-options>
             <ion-item-options side="end">
-              <ion-item-option color="danger" (click)="deleteList(todoList)">
-                <ion-icon slot="start" name="trash"></ion-icon>
-                Delete
+              <ion-item-option color="primary" (click)="invite(todoList)">
+                <ion-icon slot="top" name="person-add" aria-hidden="true"></ion-icon>
+                Invite
               </ion-item-option>
+              @if (todoList.ownerUid === uid) {
+                <ion-item-option color="medium" (click)="renameList(todoList)">
+                  <ion-icon slot="top" name="create" aria-hidden="true"></ion-icon>
+                  Rename
+                </ion-item-option>
+                <ion-item-option color="danger" (click)="deleteList(todoList)">
+                  <ion-icon slot="top" name="trash" aria-hidden="true"></ion-icon>
+                  Delete
+                </ion-item-option>
+              } @else {
+                <ion-item-option color="danger" (click)="leaveList(todoList)">
+                  <ion-icon slot="top" name="exit" aria-hidden="true"></ion-icon>
+                  Leave
+                </ion-item-option>
+              }
             </ion-item-options>
           </ion-item-sliding>
         }
       </ion-list>
-    } @else {
-      @for (todoList of todoLists; track todoList.id) {
-        <ion-card>
-          <ion-card-header>
-            <h2 class="ion-text-center">
-              <ion-text color="primary">{{ todoList.name }}</ion-text>
-            </h2>
-          </ion-card-header>
-          <ion-card-content (click)="goToDetails(todoList)">
-            <h3 class="ion-text-center">
-              <ion-text color="gray">
-                <i>Click on <ion-text color="warning">the list</ion-text> to see its tasks</i>
-              </ion-text>
-            </h3>
-          </ion-card-content>
-          <ion-row class="ion-justify-content-around">
-            <ion-col size="3">
-              <ion-button fill="clear" size="small" color="danger" (click)="deleteList(todoList)">
-                <ion-icon slot="start" name="trash"></ion-icon>
-                Delete
-              </ion-button>
-            </ion-col>
-            <ion-col size="4">
-              <ion-button fill="clear" size="small" color="warning" (click)="renameList(todoList)">
-                <ion-icon slot="start" name="create"></ion-icon>
-                Edit name
-              </ion-button>
-            </ion-col>
-            <ion-col size="4">
-              <ion-button fill="clear" size="small" color="success" (click)="shareTodoList(todoList)">
-                <ion-icon slot="start" name="share"></ion-icon>
-                Share
-              </ion-button>
-            </ion-col>
-            <ion-col size="3" class="ion-align-self-center ion-text-center">
-              <ion-note> {{ todoList.date | dateCreated }} </ion-note>
-            </ion-col>
-          </ion-row>
-        </ion-card>
+    } @empty {
+      @if (all.length) {
+        <app-empty-list icon="list-circle" h1Text="No matches" [h3Text]="'Nothing called “' + search() + '”.'" />
+      } @else {
+        <app-empty-list
+          icon="list-circle"
+          h1Text="No lists yet"
+          h3Text="Tap + to start one. Name it “Shopping” for grocery aisles."
+        />
       }
+    }
+    @if (sections().length) {
+      <p class="hint"><ion-note>Swipe a list left to invite people, rename or delete it.</ion-note></p>
     }
   } @else {
     <ion-spinner></ion-spinner>
   }
 
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button color="secondary" (click)="addList()">
-      <ion-icon name="add"></ion-icon>
+    <ion-fab-button aria-label="New list" (click)="addList()">
+      <ion-icon name="add" aria-hidden="true"></ion-icon>
     </ion-fab-button>
   </ion-fab>
 </ion-content>

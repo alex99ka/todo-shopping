@@ -1,33 +1,25 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
-import {
-  IonButton,
-  IonCol,
-  IonContent,
-  IonGrid,
-  IonIcon,
-  IonInput,
-  IonItem,
-  IonRow,
-  LoadingController,
-} from '@ionic/angular';
+import { ActivatedRoute, Router } from '@angular/router';
+import { IonButton, IonContent, IonIcon, LoadingController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { logoFacebook, logoGoogle } from 'ionicons/icons';
+import { logoGoogle } from 'ionicons/icons';
 import { AuthService } from '../../core';
 
 @Component({
   selector: 'app-auth',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './auth.page.html',
-  imports: [IonContent, IonGrid, IonRow, IonCol, IonItem, IonInput, IonButton, IonIcon],
+  styleUrl: './auth.page.scss',
+  imports: [IonContent, IonButton, IonIcon],
 })
 export class AuthPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly loadingCtrl = inject(LoadingController);
+  private readonly next = inject(ActivatedRoute).snapshot.queryParamMap.get('next') ?? '';
 
   constructor() {
-    addIcons({ logoGoogle, logoFacebook });
+    addIcons({ logoGoogle });
   }
 
   protected async signInGoogle(): Promise<void> {
@@ -45,6 +37,8 @@ export class AuthPage {
       return;
     }
     await loading.dismiss();
-    await this.router.navigateByUrl('/home');
+    // Only same-app paths: '//evil.example' would be an open redirect.
+    const safe = this.next.startsWith('/') && !this.next.startsWith('//');
+    await this.router.navigateByUrl(safe ? this.next : '/home');
   }
 }

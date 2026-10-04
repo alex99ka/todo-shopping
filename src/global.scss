@@ -1,32 +1,65 @@
 @use './theme/variables.scss' as *;
 
-
-h2 {
-  white-space: normal;
+h1,
+h2,
+h3,
+ion-title,
+ion-list-header {
+  font-family: var(--app-font-heading);
 }
 
-@media only screen and (max-width: 520px) {
-  h2 {
-    white-space: nowrap !important;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
+ion-title {
+  font-weight: 600;
 }
 
-.strike {
-  text-decoration: line-through;
+ion-list-header {
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
-.text-center {
-  text-align: center;
+ion-list[inset] {
+  border-radius: 14px;
 }
 
-.center-vertically {
-  padding-top: 25%;
-  padding-bottom: 25%;
+// Visible keyboard focus everywhere (Ionic hides the native ring on some parts).
+:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
+}
+
+ion-fab-button {
+  --box-shadow: none;
 }
 
 ion-spinner {
   display: block;
-  margin: auto;
+  margin: 48px auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+// Sentence case reads friendlier than Material's all-caps buttons.
+ion-button,
+ion-item-option {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+// Keep a readable measure on tablets and desktop instead of edge-to-edge rows.
+@media (min-width: 768px) {
+  ion-list[inset],
+  ion-list-header,
+  ion-searchbar,
+  .summary,
+  .hint {
+    max-width: 720px;
+    margin-inline: auto !important;
+  }
 }

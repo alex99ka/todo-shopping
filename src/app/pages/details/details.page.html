@@ -4,61 +4,75 @@
       <ion-back-button defaultHref="/home"></ion-back-button>
     </ion-buttons>
     <ion-title>{{ todoList()?.name }}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button aria-label="List options" (click)="openMenu()">
+        <ion-icon slot="icon-only" name="ellipsis-vertical" aria-hidden="true"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
+<ion-content>
   @if (todoList()) {
-    @for (item of items(); track item.id) {
-      <ion-card>
-        <ion-card-content (click)="updateItem(item)">
-          @if (photoUrl(item); as photo) {
-            <img [src]="photo" [alt]="item.name" width="300" height="300" />
-          }
-          <ion-card-title>
-            <ion-row>
-              <ion-col size="9">{{ item.name }}</ion-col>
-              <ion-col size="3" class="ion-align-self-start">
-                <p class="ion-text-end">
-                  <ion-text [color]="item.state ? 'success' : 'danger'">
-                    <b>{{ item.state | finished }}</b>
-                  </ion-text>
-                </p>
-              </ion-col>
-            </ion-row>
-          </ion-card-title>
-          <p>{{ item.description }}</p>
-        </ion-card-content>
-        <ion-row>
-          <ion-col class="ion-align-self-center ion-text-center">
-            <ion-button fill="clear" size="small" color="danger" (click)="deleteItem(item)">
-              <ion-icon slot="start" name="trash"></ion-icon>
-              Delete
-            </ion-button>
-          </ion-col>
-          <ion-col class="ion-align-self-center ion-text-center">
-            <ion-button fill="clear" size="small" color="warning" (click)="updateItem(item)">
-              <ion-icon slot="start" name="create"></ion-icon>
-              Edit
-            </ion-button>
-          </ion-col>
-          <ion-col class="ion-align-self-center ion-text-center">
-            <ion-note>{{ item.date | dateCreated }}</ion-note>
-          </ion-col>
-        </ion-row>
-      </ion-card>
+    @if (items().length) {
+      <p class="summary" aria-live="polite">
+        @if (remaining()) {
+          {{ remaining() }} {{ shopping() ? 'to buy' : 'to do' }}
+        } @else {
+          All done
+        }
+      </p>
+    }
+    @for (group of groups(); track group.category) {
+      @if (group.category) {
+        <ion-list-header class="aisle">{{ group.category }}</ion-list-header>
+      }
+      <ion-list inset>
+        @for (item of group.items; track item.id) {
+          <ion-item-sliding>
+            <ion-item [class.done]="item.state">
+              <ion-checkbox
+                slot="start"
+                [checked]="item.state"
+                [attr.aria-label]="item.name"
+                (ionChange)="toggleItem(item)"
+              ></ion-checkbox>
+              <ion-label class="ion-text-wrap" (click)="updateItem(item)">
+                <h2>{{ item.name }}</h2>
+                @if (item.description) {
+                  <p>{{ item.description }}</p>
+                }
+                @if (reminderText(item); as when) {
+                  <p class="reminder"><ion-icon name="alarm" aria-hidden="true"></ion-icon> {{ when }}</p>
+                }
+              </ion-label>
+              @if (photoUrl(item); as photo) {
+                <ion-thumbnail slot="end"><img [src]="photo" alt="" /></ion-thumbnail>
+              }
+            </ion-item>
+            <ion-item-options side="end">
+              <ion-item-option color="danger" (click)="deleteItem(item)">
+                <ion-icon slot="icon-only" name="trash" aria-label="Delete"></ion-icon>
+              </ion-item-option>
+            </ion-item-options>
+          </ion-item-sliding>
+        }
+      </ion-list>
     } @empty {
-      <app-empty-list
-        icon="notifications"
-        h1Text="OMG!"
-        h3Text="You have no Tasks."
-        h3TextSecond="Let's change that!"
-      />
+      @if (shopping()) {
+        <app-empty-list
+          icon="basket"
+          h1Text="Nothing to buy"
+          h3Text="Tap + to add an item, or send a recipe here from the recipe book."
+        />
+      } @else {
+        <app-empty-list icon="list-circle" h1Text="Nothing to do" h3Text="Tap + to add a task." />
+      }
     }
   }
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button color="secondary" (click)="addItem()">
-      <ion-icon name="add"></ion-icon>
+    <ion-fab-button [attr.aria-label]="shopping() ? 'Add item' : 'Add task'" (click)="addItem()">
+      <ion-icon name="add" aria-hidden="true"></ion-icon>
     </ion-fab-button>
   </ion-fab>
 </ion-content>

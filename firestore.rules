@@ -6,14 +6,137 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isMember(list) {
-      return signedIn() && request.auth.uid in list.memberUids;
+    function isMember(doc) {
+      return signedIn() && request.auth.uid in doc.memberUids;
+    }
+
+    function household(id) {
+      return get(/databases/$(database)/documents/households/$(id)).data;
+    }
+
+    // A list filed under a household. Like items with listCreatedAt, the list is bound to
+    // the household's unforgeable createdAt, so a household recreated under a deleted
+    // one's id does not inherit its lists.
+    function inHousehold(list) {
+      return list.get('householdId', null) != null
+        && isMember(household(list.householdId))
+        && list.get('householdCreatedAt', null) == household(list.householdId).createdAt;
+    }
+
+    // A list is visible to its own members and, when it belongs to a household,
+    // to everyone in that household.
+    function canUseList(list) {
+      return isMember(list) || inHousehold(list);
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // Join through an invite: the writer appends only themselves, stamps only
+    // their own joinedAt, and records under their own uid in `invites` an
+    // unexpired invite for this exact target. Leaving keeps invites.<uid>, so a
+    // rejoin with the same invite leaves the map unchanged.
+    function isInvitedJoin(kind, targetId) {
+      let uid = request.auth.uid;
+      let invites = request.resource.data.invites;
+      let invite = get(/databases/$(database)/documents/invites/$(invites[uid])).data;
+      return signedIn()
+        && !(uid in resource.data.memberUids)
+        && changedKeys().hasOnly(['memberUids', 'joinedAt', 'invites'])
+        && request.resource.data.memberUids == resource.data.memberUids.concat([uid])
+        && request.resource.data.joinedAt.diff(resource.data.joinedAt).affectedKeys().hasOnly([uid])
+        && request.resource.data.joinedAt[uid] == request.time
+        && invites.diff(resource.data.get('invites', {})).affectedKeys().hasOnly([uid])
+        && invite.kind == kind
+        && invite.targetId == targetId
+        && request.time < invite.createdAt + duration.value(7, 'd')
+        && inviterStillIn(kind, invite.createdBy);
+    }
+
+    function inviterStillIn(kind, inviter) {
+      let d = resource.data;
+      return inviter in d.memberUids
+        || (kind == 'list'
+            && d.get('householdId', null) != null
+            && d.get('householdCreatedAt', null) == household(d.householdId).createdAt
+            && inviter in household(d.householdId).memberUids);
+    }
+
+    function isSelfRemoval() {
+      let uid = request.auth.uid;
+      return signedIn()
+        && uid in resource.data.memberUids
+        && uid != resource.data.ownerUid
+        && changedKeys().hasOnly(['memberUids', 'joinedAt'])
+        && request.resource.data.memberUids == resource.data.memberUids.removeAll([uid])
+        && request.resource.data.joinedAt.diff(resource.data.joinedAt).affectedKeys().hasOnly([uid])
+        && !(uid in request.resource.data.joinedAt);
+    }
+
+    function validNewGroup(extraKeys) {
+      let d = request.resource.data;
+      let uid = request.auth.uid;
+      return d.keys().hasAll(['ownerUid', 'name', 'date', 'createdAt', 'memberUids', 'joinedAt'])
+        && d.keys().hasOnly(['ownerUid', 'name', 'date', 'createdAt', 'memberUids', 'joinedAt'].concat(extraKeys))
+        && d.ownerUid == uid
+        && d.name is string && d.name.size() <= 100
+        && d.date is number
+        && d.createdAt == request.time
+        && d.memberUids == [uid]
+        && d.joinedAt.keys().toSet() == [uid].toSet()
+        && d.joinedAt[uid] == request.time;
     }
 
     match /users/{userId} {
+      // Private: the app only ever reads and writes your own profile; the
+      // notifier reads names through the Admin SDK, which bypasses rules.
+      allow read, write: if signedIn() && request.auth.uid == userId;
+
+      // Push tokens. Only the notifier (Admin SDK, which bypasses rules) reads
+      // other people's tokens.
+      match /tokens/{token} {
+        allow read, delete: if signedIn() && request.auth.uid == userId;
+        allow create, update: if signedIn() && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly(['platform', 'updatedAt'])
+          && request.resource.data.platform in ['web', 'android', 'ios']
+          && request.resource.data.updatedAt == request.time;
+      }
+    }
+
+    match /households/{householdId} {
+      function isOwner() {
+        return signedIn() && request.auth.uid == resource.data.ownerUid;
+      }
+
+      allow read: if isMember(resource.data);
+      allow create: if signedIn() && validNewGroup([]);
+      allow delete: if isOwner();
+      allow update: if (isOwner() && changedKeys().hasOnly(['name'])
+                        && request.resource.data.name is string
+                        && request.resource.data.name.size() <= 100)
+                    || isSelfRemoval()
+                    || isInvitedJoin('household', householdId);
+    }
+
+    match /invites/{inviteId} {
+      // The id is the secret (random, 20 chars), so a single get is allowed to
+      // anyone signed in, but nobody can list invites.
       allow get: if signedIn();
       allow list: if false;
-      allow write: if signedIn() && request.auth.uid == userId;
+      allow delete: if signedIn() && request.auth.uid == resource.data.createdBy;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['kind', 'targetId', 'targetName', 'createdBy', 'createdAt'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.targetName is string
+        && request.resource.data.targetName.size() <= 100
+        && (
+          (request.resource.data.kind == 'list'
+            && canUseList(get(/databases/$(database)/documents/lists/$(request.resource.data.targetId)).data))
+          || (request.resource.data.kind == 'household'
+            && isMember(household(request.resource.data.targetId)))
+        );
     }
 
     match /lists/{listId} {
@@ -21,45 +144,27 @@ service cloud.firestore {
         return signedIn() && request.auth.uid == resource.data.ownerUid;
       }
 
-      function changedKeys() {
-        return request.resource.data.diff(resource.data).affectedKeys();
-      }
-
-      function validNewList() {
+      function validHousehold() {
         let d = request.resource.data;
-        let uid = request.auth.uid;
-        return d.keys().hasAll(['ownerUid', 'name', 'date', 'createdAt', 'memberUids', 'joinedAt'])
-          && d.keys().hasOnly(['ownerUid', 'name', 'date', 'createdAt', 'memberUids', 'joinedAt'])
-          && d.ownerUid == uid
-          && d.name is string
-          && d.date is number
-          && d.createdAt == request.time
-          && d.memberUids == [uid]
-          && d.joinedAt.keys().toSet() == [uid].toSet()
-          && d.joinedAt[uid] == request.time;
-      }
-
-      function isSelfRemoval() {
-        let uid = request.auth.uid;
-        return signedIn()
-          && uid in resource.data.memberUids
-          && uid != resource.data.ownerUid
-          && changedKeys().hasOnly(['memberUids', 'joinedAt'])
-          && request.resource.data.memberUids == resource.data.memberUids.removeAll([uid])
-          && request.resource.data.joinedAt.diff(resource.data.joinedAt).affectedKeys().hasOnly([uid])
-          && !(uid in request.resource.data.joinedAt);
+        return (d.get('householdId', null) == null && d.get('householdCreatedAt', null) == null)
+          || inHousehold(d);
       }
 
       function validMutableFields() {
         return request.resource.data.name is string
+          && request.resource.data.name.size() <= 100
           && request.resource.data.date is number;
       }
 
-      allow read: if isMember(resource.data);
-      allow create: if signedIn() && validNewList();
+      allow read: if canUseList(resource.data);
+      allow create: if signedIn() && validNewGroup(['householdId', 'householdCreatedAt'])
+        && validHousehold();
       allow delete: if isOwner();
-      allow update: if (isOwner() && changedKeys().hasOnly(['name', 'date']) && validMutableFields())
-                    || isSelfRemoval();
+      allow update: if (isOwner()
+                        && changedKeys().hasOnly(['name', 'date', 'householdId', 'householdCreatedAt'])
+                        && validMutableFields() && validHousehold())
+                    || isSelfRemoval()
+                    || isInvitedJoin('list', listId);
 
       match /items/{itemId} {
         function parent() {
@@ -73,16 +178,30 @@ service cloud.firestore {
           return item.listCreatedAt == parent().createdAt;
         }
 
-        function isListOwner() {
-          return signedIn() && request.auth.uid == parent().ownerUid;
+        function validItem() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['name', 'state', 'description', 'date', 'listCreatedAt',
+                                   'photoPath', 'category', 'remindAt', 'reminded', 'by'])
+            && d.name is string && d.name.size() <= 500
+            && d.description is string && d.description.size() <= 5000
+            && d.state is bool
+            && d.date is number
+            && d.get('category', '') is string && d.get('category', '').size() <= 50
+            && d.get('photoPath', '') is string && d.get('photoPath', '').size() <= 300
+            && (d.get('remindAt', null) == null || d.remindAt is number)
+            && d.get('reminded', false) is bool;
         }
 
-        allow read: if isMember(parent()) && sameEpoch(resource.data);
-        allow create: if isListOwner() && sameEpoch(request.resource.data);
-        allow update: if isListOwner()
+        allow read: if canUseList(parent()) && sameEpoch(resource.data);
+        allow create: if canUseList(parent()) && sameEpoch(request.resource.data) && validItem()
+          && request.resource.data.by == request.auth.uid;
+        allow update: if canUseList(parent())
           && sameEpoch(resource.data)
-          && sameEpoch(request.resource.data);
-        allow delete: if isListOwner() && sameEpoch(resource.data);
+          && sameEpoch(request.resource.data)
+          && validItem()
+          && request.resource.data.get('by', null) == resource.data.get('by', null)
+          && request.resource.data.date == resource.data.date;
+        allow delete: if canUseList(parent()) && sameEpoch(resource.data);
       }
     }
   }
