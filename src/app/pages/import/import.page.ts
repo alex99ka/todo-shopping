@@ -93,7 +93,7 @@ interface Incoming {
     </ion-content>
     @if (!error()) {
       <ion-footer class="ion-padding">
-        <ion-button expand="block" [disabled]="busy()" (click)="run()">
+        <ion-button expand="block" color="tertiary" [disabled]="busy()" (click)="run()">
           {{ busy() ? 'מוסיף…' : 'הוספת ' + items.length + ' פריטים' }}
         </ion-button>
       </ion-footer>

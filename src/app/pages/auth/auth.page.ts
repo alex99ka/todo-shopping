@@ -4,6 +4,7 @@ import { IonButton, IonContent, IonIcon, LoadingController } from '@ionic/angula
 import { addIcons } from 'ionicons';
 import { logoGoogle } from 'ionicons/icons';
 import { AuthService } from '../../core';
+import { AlertService } from '../../shared';
 
 @Component({
   selector: 'app-auth',
@@ -16,6 +17,7 @@ export class AuthPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly loadingCtrl = inject(LoadingController);
+  private readonly alert = inject(AlertService);
   private readonly next = inject(ActivatedRoute).snapshot.queryParamMap.get('next') ?? '';
 
   constructor() {
@@ -32,8 +34,13 @@ export class AuthPage {
     await loading.present();
     try {
       await signIn;
-    } catch {
+    } catch (e) {
       await loading.dismiss();
+      // Closing the popup is a choice, not an error; anything else must be visible.
+      const code = (e as { code?: string }).code ?? '';
+      if (!/popup-closed|cancelled-popup|canceled/.test(code)) {
+        await this.alert.presentToast(`הכניסה נכשלה (${code || 'שגיאה'}). נסו שוב.`);
+      }
       return;
     }
     await loading.dismiss();
