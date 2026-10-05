@@ -219,12 +219,10 @@ def digest(db, st):
     day = now.date().isoformat()
     if now.hour < DIGEST_HOUR or st.get('digest_day') == day:
         return
-    st['digest_day'] = day
     ref = db.document('notifier/state')
     if (ref.get().to_dict() or {}).get('lastDigest') == day:
+        st['digest_day'] = day
         return
-    # Recorded before sending: a restart or a failure must not send it twice.
-    ref.set({'lastDigest': day}, merge=True)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     day_start = int(start.timestamp() * 1000)
     day_end = int((start + timedelta(days=1)).timestamp() * 1000)
@@ -243,6 +241,10 @@ def digest(db, st):
             continue
         who = {item['assignee']} & uids if item.get('assignee') in uids else uids
         rows.append((who, item['dueAt']))
+    # Recorded once the query worked (a missing index retries next poll) and before
+    # sending, so a restart or a failed send never repeats it.
+    st['digest_day'] = day
+    ref.set({'lastDigest': day}, merge=True)
     for uid, (late, today) in digest_counts(rows, day_start, day_end).items():
         send(tokens_of(db, [uid]), 'בוקר טוב', digest_text(late, today), '/home')
     log.info('digest %s sent', day)
