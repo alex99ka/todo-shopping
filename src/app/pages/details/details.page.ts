@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   ActionSheetController,
@@ -21,6 +22,7 @@ import {
   IonFabButton,
   IonHeader,
   IonIcon,
+  IonInput,
   IonItem,
   IonItemOption,
   IonItemOptions,
@@ -33,6 +35,7 @@ import {
   IonTitle,
   IonToolbar,
   ModalController,
+  ToastController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
@@ -41,8 +44,10 @@ import {
   basket,
   calendar,
   checkboxOutline,
+  ellipsisHorizontal,
   ellipsisVertical,
   flag,
+  send,
   trash,
 } from 'ionicons/icons';
 import { firstValueFrom, of, shareReplay, switchMap } from 'rxjs';
@@ -53,7 +58,15 @@ import {
   PhotoService,
   TodoListService,
 } from '../../core';
-import { CATEGORIES, CATEGORY_LABELS, Household, Item, TodoList, isShopping } from '../../models';
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  Household,
+  Item,
+  TodoList,
+  guessAisle,
+  isShopping,
+} from '../../models';
 import { AlertService, EmptyListComponent } from '../../shared';
 import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
 
@@ -63,6 +76,7 @@ import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
   styleUrl: './details.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FormsModule,
     IonBackButton,
     IonButton,
     IonButtons,
@@ -72,6 +86,7 @@ import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
     IonFabButton,
     IonHeader,
     IonIcon,
+    IonInput,
     IonItem,
     IonItemOption,
     IonItemOptions,
@@ -91,6 +106,7 @@ export class DetailsPage {
   private readonly photos = inject(PhotoService);
   private readonly alert = inject(AlertService);
   private readonly modalCtrl = inject(ModalController);
+  private readonly toastCtrl = inject(ToastController);
   private readonly actionSheet = inject(ActionSheetController);
   private readonly households = inject(HouseholdService);
   private readonly invites = inject(InviteService);
@@ -154,12 +170,25 @@ export class DetailsPage {
     return groups.filter((g) => g.items.length);
   });
 
+  protected readonly quickName = signal('');
+
   private readonly photoUrls = signal<Record<string, string>>({});
   private readonly loadingPhotos = new Set<string>();
   private destroyed = false;
 
   constructor() {
-    addIcons({ add, alarm, basket, calendar, checkboxOutline, ellipsisVertical, flag, trash });
+    addIcons({
+      add,
+      alarm,
+      basket,
+      calendar,
+      checkboxOutline,
+      ellipsisHorizontal,
+      ellipsisVertical,
+      flag,
+      send,
+      trash,
+    });
     effect(() => {
       const wanted = this.photoPaths(this.items());
       untracked(() => this.syncPhotos(wanted));
@@ -193,7 +222,92 @@ export class DetailsPage {
   }
 
   protected deleteItem(item: Item): void {
-    this.removeItem(item).catch(() => this.alert.presentToast('משהו השתבש'));
+    void this.removeItems([item], `"${item.name}" נמחק`);
+  }
+
+  /**
+   * Type and press Enter: no editor. A shopping item lands in the aisle it had the
+   * last time, else the one its name suggests; the toast says which.
+   */
+  protected quickAdd(): void {
+    const name = this.quickName().trim();
+    const list = this.todoList();
+    if (!name || !list?.createdAt) {
+      return;
+    }
+    const same = this.items().find((i) => i.name.trim() === name && i.category);
+    const category = this.shopping() ? (same?.category ?? guessAisle(name)) : undefined;
+    void this.todoListService
+      .createItem(this.listId, this.todoListService.newItemId(this.listId), {
+        name,
+        state: false,
+        description: '',
+        date: Date.now(),
+        listCreatedAt: list.createdAt,
+        ...(category && { category }),
+      })
+      .catch(() => this.alert.presentToast('ההוספה נכשלה'));
+    this.quickName.set('');
+    if (category) {
+      void this.toast(`נוסף ל"${CATEGORY_LABELS[category] ?? category}"`, 1500);
+    }
+  }
+
+  /** The ⋯ on a section heading: tick off, put back or empty the whole section. */
+  protected async groupMenu(group: { key: string; title: string; items: Item[] }): Promise<void> {
+    const n = group.items.length;
+    const done = group.key === 'done';
+    const sheet = await this.actionSheet.create({
+      header: `${group.title} · ${n}`,
+      buttons: [
+        done
+          ? { text: 'החזרת הכול לרשימה', data: 'uncheck' }
+          : { text: this.shopping() ? 'סימון הכול כנקנה' : 'סימון הכול כבוצע', data: 'check' },
+        { text: n === 1 ? 'מחיקת הפריט' : `ריקון — מחיקת ${n} הפריטים`, role: 'destructive', data: 'empty' },
+        { text: 'ביטול', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+    const { data } = await sheet.onDidDismiss<string>();
+    if (data === 'check' || data === 'uncheck') {
+      void this.todoListService
+        .setItemsState(this.listId, group.items, data === 'check')
+        .catch(() => this.alert.presentToast('משהו השתבש'));
+    } else if (data === 'empty') {
+      void this.removeItems(group.items, `"${group.title}" רוקנה`);
+    }
+  }
+
+  /**
+   * Deletes at once and offers undo instead of asking first: quicker, and nothing is
+   * lost. Photos go only once the undo window has passed.
+   */
+  private async removeItems(items: Item[], message: string): Promise<void> {
+    if (!items.length) {
+      return;
+    }
+    void this.todoListService
+      .deleteItems(this.listId, items)
+      .catch(() => this.alert.presentToast('המחיקה נכשלה'));
+    const toast = await this.toastCtrl.create({
+      message,
+      duration: 5000,
+      buttons: [{ text: 'ביטול', role: 'undo' }],
+    });
+    await toast.present();
+    const { role } = await toast.onDidDismiss();
+    if (role === 'undo') {
+      void this.todoListService
+        .restoreItems(this.listId, items)
+        .catch(() => this.alert.presentToast('השחזור נכשל'));
+    } else {
+      items.forEach((i) => i.photoPath && void this.photos.removeQuietly(i.photoPath));
+    }
+  }
+
+  private async toast(message: string, duration: number): Promise<void> {
+    const toast = await this.toastCtrl.create({ message, duration });
+    await toast.present();
   }
 
   /** Drives the deadline chip's colour; the chip's text says the same in words. */
@@ -239,7 +353,8 @@ export class DetailsPage {
       return;
     }
     const owner = list.ownerUid === this.uid;
-    const done = this.items().filter((i) => i.state);
+    const all = this.items();
+    const done = all.filter((i) => i.state);
     const sheet = await this.actionSheet.create({
       header: list.name,
       buttons: [
@@ -251,6 +366,7 @@ export class DetailsPage {
             ]
           : []),
         ...(done.length ? [{ text: `ניקוי ${done.length} שסומנו`, data: 'clear' }] : []),
+        ...(all.length ? [{ text: 'ריקון הרשימה', role: 'destructive', data: 'empty' }] : []),
         ...(!owner && list.memberUids.includes(this.uid ?? '')
           ? [{ text: 'עזיבת הרשימה', role: 'destructive', data: 'leave' }]
           : []),
@@ -270,8 +386,9 @@ export class DetailsPage {
       } else if (data === 'move') {
         await this.moveToHousehold(list);
       } else if (data === 'clear') {
-        // Not awaited, so it also works offline: the local cache drops them at once.
-        done.forEach((i) => this.deleteItem(i));
+        void this.removeItems(done, `${done.length} נוקו`);
+      } else if (data === 'empty') {
+        void this.removeItems(all, 'הרשימה רוקנה');
       } else if (data === 'leave') {
         await this.todoListService.leaveList(list.id);
         await this.router.navigateByUrl('/home', { replaceUrl: true });
@@ -322,15 +439,6 @@ export class DetailsPage {
     if (role !== 'cancel' && role !== 'backdrop' && (data?.id ?? null) !== (list.householdId ?? null)) {
       await this.todoListService.setHousehold(list.id, data ?? null);
       await this.alert.presentToast('הרשימה הועברה');
-    }
-  }
-
-  // The item goes first: a failed photo delete then leaves an unreferenced object,
-  // not a visible item whose photo is missing.
-  private async removeItem(item: Item): Promise<void> {
-    await this.todoListService.deleteItem(this.listId, item.id);
-    if (item.photoPath) {
-      await this.photos.removeQuietly(item.photoPath);
     }
   }
 
@@ -385,7 +493,11 @@ export class DetailsPage {
       },
     });
     await modal.present();
-    await modal.onDidDismiss();
+    // The editor's delete button hands back here, so it gets the same undo.
+    const { role } = await modal.onDidDismiss();
+    if (role === 'delete' && item) {
+      this.deleteItem(item);
+    }
   }
 }
 

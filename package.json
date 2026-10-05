@@ -1,6 +1,6 @@
 {
   "name": "todo-shopping",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "author": "alex99ka (forked from Hamza Hamidi's todo-list)",
   "homepage": "https://alex-todo-shopping.web.app",
   "description": "Todo and shopping lists with households, synced through Firebase, with a recipe-book import",

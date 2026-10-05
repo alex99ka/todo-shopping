@@ -17,7 +17,7 @@ import { grid, list, search } from 'ionicons/icons';
   imports: [IonHeader, IonToolbar, IonButtons, IonMenuButton, IonTitle, IonButton, IonIcon],
   template: `
     <ion-header>
-      <ion-toolbar color="primary">
+      <ion-toolbar>
         <ion-buttons slot="start">
           <ion-menu-button></ion-menu-button>
         </ion-buttons>

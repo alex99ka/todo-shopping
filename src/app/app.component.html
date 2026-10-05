@@ -5,10 +5,8 @@
         <div class="profil">
           <img class="profil-img" [src]="profile.photoURL" alt="" referrerpolicy="no-referrer" />
           <p class="profil-text">
-            <ion-text color="light">
-              <b>{{ profile.displayName }}</b>
-              <br />{{ profile.email }}
-            </ion-text>
+            <b>{{ profile.displayName }}</b>
+            <br /><span class="email">{{ profile.email }}</span>
           </p>
         </div>
       </ion-header>

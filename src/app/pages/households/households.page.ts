@@ -44,7 +44,7 @@ import { AlertService, EmptyListComponent } from '../../shared';
   ],
   template: `
     <ion-header>
-      <ion-toolbar color="primary">
+      <ion-toolbar>
         <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
         <ion-title>משקי בית</ion-title>
       </ion-toolbar>

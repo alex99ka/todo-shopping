@@ -9,6 +9,7 @@ import {
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { collectionData, docData } from 'rxfire/firestore';
 import { Observable, catchError, combineLatest, map, of, retry, switchMap } from 'rxjs';
@@ -148,7 +149,31 @@ export class TodoListService {
     return updateDoc(doc(this.db, 'lists', listId, 'items', itemId), { ...changes });
   }
 
-  deleteItem(listId: string, itemId: string): Promise<void> {
-    return deleteDoc(doc(this.db, 'lists', listId, 'items', itemId));
+  // Bulk edits are one batch: atomic, one round trip, and a single queued write offline.
+  // ponytail: a batch caps at 500 writes; no list gets near that.
+
+  deleteItems(listId: string, items: Item[]): Promise<void> {
+    const batch = writeBatch(this.db);
+    items.forEach((i) => batch.delete(this.itemRef(listId, i.id)));
+    return batch.commit();
+  }
+
+  /** Undo of deleteItems: the same ids come back, added by whoever pressed undo. */
+  restoreItems(listId: string, items: Item[]): Promise<void> {
+    const batch = writeBatch(this.db);
+    for (const { id, ...item } of items) {
+      batch.set(this.itemRef(listId, id), { ...item, by: this.auth.uid });
+    }
+    return batch.commit();
+  }
+
+  setItemsState(listId: string, items: Item[], state: boolean): Promise<void> {
+    const batch = writeBatch(this.db);
+    items.forEach((i) => batch.update(this.itemRef(listId, i.id), { state }));
+    return batch.commit();
+  }
+
+  private itemRef(listId: string, itemId: string) {
+    return doc(this.db, 'lists', listId, 'items', itemId);
   }
 }

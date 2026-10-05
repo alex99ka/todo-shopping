@@ -58,7 +58,7 @@ interface Incoming {
   `,
   template: `
     <ion-header>
-      <ion-toolbar color="primary">
+      <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button (click)="home()">ביטול</ion-button>
         </ion-buttons>

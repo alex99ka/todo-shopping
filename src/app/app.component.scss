@@ -1,7 +1,13 @@
 .navigation-drawer {
-  // Toolbar green in both themes: the drawer text is always white.
-  background: #047857;
+  background: var(--app-primary-soft);
+  color: var(--ion-text-color);
   height: auto;
+  box-shadow: none !important;
+}
+
+.email {
+  color: var(--ion-color-medium-shade);
+  font-size: 0.9rem;
 }
 
 .profil {

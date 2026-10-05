@@ -12,6 +12,21 @@ ion-title {
   font-weight: 600;
 }
 
+// Light bars: a hairline instead of Material's shadow, green controls on white.
+ion-header {
+  box-shadow: none !important;
+}
+
+ion-toolbar {
+  --border-width: 0 0 1px 0;
+}
+
+ion-toolbar ion-back-button,
+ion-toolbar ion-menu-button,
+ion-toolbar ion-buttons ion-button {
+  --color: var(--ion-color-primary);
+}
+
 ion-list-header {
   font-weight: 600;
   font-size: 0.95rem;
@@ -43,6 +58,21 @@ ion-spinner {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+// Undo and other toast actions: light green on the dark toast (Ionic's default
+// primary there is under 3:1).
+ion-toast {
+  --button-color: #6ee7b7;
+}
+
+// The drawer is one light surface, not white rows on mint.
+ion-menu ion-content {
+  --background: #ffffff;
+}
+
+ion-menu ion-item {
+  --background: transparent;
 }
 
 // Sentence case reads friendlier than Material's all-caps buttons.

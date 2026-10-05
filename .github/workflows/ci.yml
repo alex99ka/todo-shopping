@@ -24,5 +24,6 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - run: node --test 'test/unit/**/*.test.ts'
       - run: npm run test:rules
       - run: npm run test:services

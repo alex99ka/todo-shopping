@@ -18,7 +18,7 @@ import { Invite } from '../../models';
   imports: [IonButton, IonContent, IonHeader, IonSpinner, IonText, IonTitle, IonToolbar],
   template: `
     <ion-header>
-      <ion-toolbar color="primary"><ion-title>הזמנה</ion-title></ion-toolbar>
+      <ion-toolbar><ion-title>הזמנה</ion-title></ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding ion-text-center">
       @if (error()) {

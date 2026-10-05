@@ -238,9 +238,10 @@ Before delivering any UI code, verify:
 
 ## Project decisions (override the generated values above)
 
-- **Primary is `#047857` (emerald-700), not `#059669`.** White toolbar/button text on `#059669` is 3.8:1 and fails WCAG AA; on `#047857` it is 5.5:1. Dark mode uses `#34d399` with black text, toolbars stay deep green `#064e3b` with white text.
+- **Primary is `#047857` (emerald-700), not `#059669`.** White button text on `#059669` is 3.8:1 and fails WCAG AA; on `#047857` it is 5.5:1.
+- **Light only (user's choice, 2026-10-05).** No dark mode. Background `#f6faf8`, white cards, white top bars with dark text and a hairline border (no shadow), green icons in the bars, light-mint drawer header on a white drawer. Status bar white with dark icons; `theme-color` white.
 - **Amber is an accent only** (`--app-accent-soft` / `--app-accent-ink`, `tertiary` for fills). Never as a text color on white below `#92400e`.
-- **List types have their own identity.** Shopping = amber: basket icon, aisle headings, count pills, checkboxes, progress bar, add button. Tasks = green: checkbox icon, primary everything. The toolbar stays brand green for both (amber can't carry white text).
+- **List types have their own identity.** Shopping = amber: basket icon, aisle headings, count pills, checkboxes, progress bar, add button. Tasks = green: checkbox icon, primary everything. A rounded badge before the title carries the type (amber basket / green checkbox).
 - **RTL.** `<html dir="rtl" lang="he">`; use logical properties only (`margin-inline`, `padding-inline`), never left/right. User text gets `dir="auto"`.
 - **Deadline chips:** pill with icon and words; late = `--app-danger-soft`/`--app-danger-ink` plus the word "באיחור", today/reminder = accent, later = neutral. Colour is never the only signal.
 - **Every swipe action has a tap alternative** (WCAG 2.2 dragging): item delete in the editor, list rename/delete in the list's ⋮ menu.
@@ -250,3 +251,7 @@ Before delivering any UI code, verify:
 - **Buttons are sentence case**; icon-only buttons always carry `aria-label`, decorative icons `aria-hidden="true"`.
 - **Motion:** 150–200ms opacity/colour transitions only; everything collapses under `prefers-reduced-motion`.
 - **Icon:** white basket with a green check on `#047857` (`resources/icon.png`, `src/assets/imgs/logo.png`, maskable variant `icon-maskable.png`).
+- **Fluent over modal.** Each list has a quick-add field under the title: type, Enter, keep typing. Shopping items take the aisle the same name had before, else a Hebrew keyword guess (`models/aisle-guess.ts`), and a short toast names the aisle. The + button opens the full editor.
+- **Section actions.** Every section heading has a ⋯ (44px) with: tick off / put back the whole section, and empty it. The list's ⋮ menu has "empty list" and "clear checked".
+- **Undo, not confirm, for item deletes.** Single, section, checked or whole-list deletes happen at once in one batch and show a 5s toast with "ביטול" that restores them. Confirm dialogs stay only for deleting a list or household, which undo cannot restore.
+- **Toast actions** use `#6ee7b7` on the dark toast (primary green there is under 3:1).

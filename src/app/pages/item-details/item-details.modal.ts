@@ -138,18 +138,9 @@ export class ItemDetailsModalComponent implements OnInit {
     }
   }
 
-  // Not awaited, so it works offline; the list drops the item from its cache at once.
+  // The list deletes it, so the editor's delete gets the list's undo toast.
   protected async remove(): Promise<void> {
-    const item = this.item;
-    if (!item) {
-      return;
-    }
-    void this.todoLists
-      .deleteItem(this.listId, item.id)
-      .then(() => (item.photoPath ? this.photos.removeQuietly(item.photoPath) : undefined))
-      .catch(() => this.alert.presentToast('המחיקה נכשלה'));
-    await this.alert.presentToast('נמחק');
-    await this.dismiss(true);
+    await this.modalCtrl.dismiss(null, 'delete');
   }
 
   protected async takePicture(): Promise<void> {

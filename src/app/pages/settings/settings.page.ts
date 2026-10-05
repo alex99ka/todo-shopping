@@ -50,7 +50,7 @@ import { AlertService } from '../../shared';
   ],
   template: `
     <ion-header>
-      <ion-toolbar color="primary">
+      <ion-toolbar>
         <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
         <ion-title>הגדרות</ion-title>
       </ion-toolbar>
@@ -79,7 +79,7 @@ import { AlertService } from '../../shared';
             [disabled]="!push.supported()"
             (ionChange)="togglePush($event)"
           >
-            <ion-label>
+            <ion-label class="ion-text-wrap">
               התראות פוש
               <p>תזכורות למשימות, פריטים שנוספו לרשימות משותפות, גרסאות חדשות</p>
             </ion-label>

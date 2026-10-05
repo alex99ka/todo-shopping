@@ -9,6 +9,21 @@ versions reach installed apps as an in-app update.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-05
+
+### Added
+
+- Quick add: type an item or task in the field under the list name and press Enter.
+  Shopping items go to the aisle that name had before, or the one the name suggests.
+- Every section has a ⋯ menu: tick off or put back the whole section, or empty it.
+- "Empty list" in the list menu.
+- Undo for every item delete (one, a section, the checked ones or the whole list).
+
+### Changed
+
+- Light design throughout: white top bars, light background and drawer. Dark mode is
+  gone.
+
 ## [1.1.2] - 2026-10-04
 
 ### Fixed
@@ -91,7 +106,8 @@ First release of Todo and Shopping, forked from
 - The non-working username/password and Facebook sign-in buttons (Google only).
 - The upstream site's Google Analytics snippet and the third-party avatar service.
 
-[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.1.2...HEAD
+[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/alex99ka/todo-shopping/compare/1.1.2...1.2.0
 [1.1.2]: https://github.com/alex99ka/todo-shopping/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/alex99ka/todo-shopping/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/alex99ka/todo-shopping/compare/1.0.0...1.1.0

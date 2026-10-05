@@ -1,20 +1,23 @@
 // Ionic theming. https://ionicframework.com/docs/theming/css-variables
 // Palette and type from design-system/todo-and-shopping/MASTER.md (flat; fresh
-// green + food amber). Primary is emerald-700 rather than the system's 600 so
-// white toolbar text clears WCAG AA (5.5:1).
+// green + food amber). Light only, by the user's choice. Primary is emerald-700
+// rather than the system's 600 so white text on it clears WCAG AA (5.5:1).
 
 :root {
   --app-font-heading: 'Rubik Variable', system-ui, sans-serif;
   // One family: Rubik is drawn for Hebrew as well as Latin (Nunito Sans has no Hebrew).
   --ion-font-family: 'Rubik Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  --ion-background-color: #f3faf7;
-  --ion-background-color-rgb: 243, 250, 247;
+  --ion-background-color: #f6faf8;
+  --ion-background-color-rgb: 246, 250, 248;
   --ion-text-color: #0f172a;
   --ion-text-color-rgb: 15, 23, 42;
   --ion-item-background: #ffffff;
-  --ion-toolbar-background: #047857;
-  --ion-border-color: #e1f2ed;
+  // Light chrome: white bars, dark text, green only where it means "act here".
+  --ion-toolbar-background: #ffffff;
+  --ion-toolbar-color: #0f172a;
+  --ion-toolbar-border-color: #e3efe9;
+  --ion-border-color: #e3efe9;
 
   --app-primary-soft: #d1fae5;
   --app-accent-soft: #fef3c7;
@@ -84,50 +87,4 @@
   --ion-color-dark-contrast-rgb: 255, 255, 255;
   --ion-color-dark-shade: #0d1425;
   --ion-color-dark-tint: #272e3f;
-}
-
-// Dark mode follows the device. Same hues, lifted for contrast on dark surfaces.
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ion-background-color: #0b1512;
-    --ion-background-color-rgb: 11, 21, 18;
-    --ion-text-color: #e2e8f0;
-    --ion-text-color-rgb: 226, 232, 240;
-    --ion-item-background: #13221d;
-    --ion-toolbar-background: #064e3b;
-    --ion-border-color: #1f3530;
-
-    --app-primary-soft: #064e3b;
-    --app-accent-soft: #451a03;
-    --app-accent-ink: #fbbf24;
-    --app-danger-soft: #450a0a;
-    --app-danger-ink: #fca5a5;
-
-    --ion-color-primary: #34d399;
-    --ion-color-primary-rgb: 52, 211, 153;
-    --ion-color-primary-contrast: #000000;
-    --ion-color-primary-contrast-rgb: 0, 0, 0;
-    --ion-color-primary-shade: #2eba87;
-    --ion-color-primary-tint: #48d7a3;
-
-    --ion-color-medium: #94a3b8;
-    --ion-color-medium-rgb: 148, 163, 184;
-    --ion-color-medium-contrast: #000000;
-    --ion-color-medium-contrast-rgb: 0, 0, 0;
-    --ion-color-medium-shade: #a8b4c6;
-    --ion-color-medium-tint: #9facbf;
-
-    --ion-color-danger: #f87171;
-    --ion-color-danger-rgb: 248, 113, 113;
-    --ion-color-danger-contrast: #000000;
-    --ion-color-danger-contrast-rgb: 0, 0, 0;
-    --ion-color-danger-shade: #da6363;
-    --ion-color-danger-tint: #f97f7f;
-  }
-
-  // The toolbar keeps white text on deep green rather than following primary.
-  ion-toolbar[color='primary'] {
-    --ion-color-base: #064e3b !important;
-    --ion-color-contrast: #ffffff !important;
-  }
 }

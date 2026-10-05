@@ -3,7 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { SplashScreen } from '@capacitor/splash-screen';
-import { StatusBar } from '@capacitor/status-bar';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import {
   IonApp,
   IonContent,
@@ -14,7 +14,6 @@ import {
   IonMenu,
   IonMenuToggle,
   IonRouterOutlet,
-  IonText,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { home, listCircle, logOut, settings } from 'ionicons/icons';
@@ -35,7 +34,6 @@ import { CustomAlert } from './models';
     IonItem,
     IonIcon,
     IonLabel,
-    IonText,
     IonMenuToggle,
     IonRouterOutlet,
     RouterLink,
@@ -86,8 +84,10 @@ export class AppComponent {
     }
     // setBackgroundColor is Android-only and rejects elsewhere; the original app
     // only ever shipped an Android build.
+    // Light app: white status bar with dark icons (Style.Light means dark content).
+    await StatusBar.setStyle({ style: Style.Light });
     if (Capacitor.getPlatform() === 'android') {
-      await StatusBar.setBackgroundColor({ color: '#33000000' });
+      await StatusBar.setBackgroundColor({ color: '#ffffff' });
     }
     await SplashScreen.hide();
   }

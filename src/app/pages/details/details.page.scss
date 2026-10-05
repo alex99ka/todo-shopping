@@ -16,6 +16,20 @@
 
 .aisle {
   margin-top: 8px;
+  padding-inline-end: 8px;
+
+  ion-label {
+    margin: 0;
+  }
+
+  // 44px hit area for the section's ⋯ menu.
+  .group-menu {
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0;
+    --color: var(--ion-color-medium);
+  }
+
   font-family: var(--app-font-heading);
   letter-spacing: 0.02em;
   color: var(--ion-color-primary-shade);
@@ -53,11 +67,68 @@
   }
 }
 
+// Type badge before the title: green checkbox for tasks, amber basket for shopping.
 .kind {
-  vertical-align: -3px;
-  margin-inline-end: 6px;
-  opacity: 0.85;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-inline-end: 8px;
+  border-radius: 9px;
+  vertical-align: middle;
+  background: var(--app-primary-soft);
+  color: var(--ion-color-primary);
+  font-size: 18px;
+
+  &.shopping {
+    background: var(--app-accent-soft);
+    color: var(--app-accent-ink);
+  }
 }
+
+// Quick add: a rounded field under the title; Enter adds and keeps the keyboard up.
+.quick-add {
+  --padding-top: 6px;
+  --padding-bottom: 10px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+}
+
+.quick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  ion-input {
+    flex: 1;
+    --padding-start: 16px;
+    --padding-end: 16px;
+    min-height: 44px;
+    border-radius: 22px;
+    background: var(--ion-background-color);
+    border: 1px solid var(--ion-border-color);
+    transition: border-color 150ms ease;
+
+    &.has-focus {
+      border-color: var(--ion-color-primary);
+    }
+  }
+
+  ion-button {
+    --padding-start: 0;
+    --padding-end: 0;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+
+    // "Send" points the way the text runs: left in Hebrew.
+    ion-icon {
+      transform: scaleX(-1);
+    }
+  }
+}
+
 
 ion-item {
   --min-height: 56px;
@@ -123,12 +194,6 @@ ion-label {
 
 ion-list:last-of-type {
   margin-bottom: 96px;
-}
-
-@media (prefers-color-scheme: dark) {
-  .chip {
-    background: var(--ion-border-color);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
