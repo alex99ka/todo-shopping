@@ -2,6 +2,12 @@ services:
   notifier:
     build: .
     restart: always
+    # Host network so Home Assistant (also host network on the Pi) is at 127.0.0.1:8123.
+    network_mode: host
+    # HA_TOKEN and HA_SYNC live here, outside the repo; without the file HA sync is off.
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - ./service-account.json:/app/service-account.json:ro
     environment:

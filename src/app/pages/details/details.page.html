@@ -19,16 +19,22 @@
   </ion-toolbar>
   @if (todoList()) {
     <ion-toolbar class="quick-add">
-      <form class="quick" (submit)="$event.preventDefault(); quickAdd()">
-        <ion-input
-          [placeholder]="shopping() ? 'מה צריך לקנות?' : 'משימה חדשה…'"
-          [attr.aria-label]="shopping() ? 'הוספה מהירה של פריט' : 'הוספה מהירה של משימה'"
-          enterkeyhint="done"
-          maxlength="500"
+      <form class="quick" (submit)="quickAdd($event)">
+        <!-- A textarea so a list pasted from a chat keeps its lines; Enter still adds. -->
+        <ion-textarea
+          [placeholder]="shopping() ? 'מה צריך לקנות? (אפשר כמה, בפסיקים)' : 'משימה חדשה…'"
+          [attr.aria-label]="shopping() ? 'הוספה מהירה של פריטים' : 'הוספה מהירה של משימות'"
+          enterkeyhint="send"
+          [rows]="1"
+          [autoGrow]="true"
+          maxlength="5000"
           [ngModel]="quickName()"
           (ngModelChange)="quickName.set($event)"
+          (keydown.enter)="!$any($event).shiftKey && quickAdd($event)"
+          (ionFocus)="quickFocused.set(true)"
+          (ionBlur)="blurQuick()"
           name="quick"
-        ></ion-input>
+        ></ion-textarea>
         <ion-button
           type="submit"
           shape="round"
@@ -39,6 +45,15 @@
           <ion-icon slot="icon-only" name="send" aria-hidden="true"></ion-icon>
         </ion-button>
       </form>
+      @if (suggestions().length) {
+        <div class="suggestions" role="list" aria-label="הוספה מהירה מהיסטוריה">
+          @for (s of suggestions(); track s.id) {
+            <button type="button" class="suggestion" role="listitem" (click)="addSuggestion(s)">
+              <ion-icon name="add" aria-hidden="true"></ion-icon>{{ s.name }}
+            </button>
+          }
+        </div>
+      }
     </ion-toolbar>
   }
 </ion-header>
@@ -47,22 +62,49 @@
   @if (todoList()) {
     @if (items().length) {
       <div class="summary">
-        <p aria-live="polite">
-          @if (remaining()) {
-            נשארו {{ remaining() }} {{ shopping() ? 'פריטים לקנות' : 'משימות' }}
-          } @else {
-            {{ shopping() ? 'הכול בסל' : 'הכול בוצע' }}
+        <div class="summary-row">
+          <p aria-live="polite">
+            @if (remaining()) {
+              נשארו {{ remaining() }} {{ shopping() ? 'פריטים לקנות' : 'משימות' }}
+            } @else {
+              {{ shopping() ? 'הכול בסל' : 'הכול בוצע' }}
+            }
+          </p>
+          @if (!shopping() && shared()) {
+            <button
+              type="button"
+              class="filter"
+              [class.on]="mineOnly()"
+              [attr.aria-pressed]="mineOnly()"
+              (click)="mineOnly.set(!mineOnly())"
+            >
+              רק שלי
+            </button>
           }
-        </p>
+        </div>
         <ion-progress-bar [color]="shopping() ? 'tertiary' : 'primary'" [value]="progress()" aria-hidden="true"></ion-progress-bar>
       </div>
     }
     @for (group of groups(); track group.key) {
       <ion-list-header class="aisle" [class.overdue]="group.key === 'overdue'">
-        <ion-label>
-          {{ group.title }}
-          <span class="count" aria-hidden="true">{{ group.items.length }}</span>
-        </ion-label>
+        @if (group.key === 'done' && shopping()) {
+          <!-- The basket folds away: in the shop only what is left matters. -->
+          <button
+            type="button"
+            class="fold"
+            [attr.aria-expanded]="basketOpen()"
+            (click)="basketOpen.set(!basketOpen())"
+          >
+            {{ group.title }}
+            <span class="count" aria-hidden="true">{{ group.items.length }}</span>
+            <ion-icon name="chevron-down" [class.open]="basketOpen()" aria-hidden="true"></ion-icon>
+          </button>
+        } @else {
+          <ion-label>
+            {{ group.title }}
+            <span class="count" aria-hidden="true">{{ group.items.length }}</span>
+          </ion-label>
+        }
         <ion-button
           class="group-menu"
           fill="clear"
@@ -73,6 +115,7 @@
           <ion-icon slot="icon-only" name="ellipsis-horizontal" aria-hidden="true"></ion-icon>
         </ion-button>
       </ion-list-header>
+      @if (group.key !== 'done' || !shopping() || basketOpen()) {
       <ion-list inset>
         @for (item of group.items; track item.id) {
           <ion-item-sliding>
@@ -84,15 +127,22 @@
                 [attr.aria-label]="item.name"
                 (ionChange)="toggleItem(item)"
               ></ion-checkbox>
-              <ion-label class="ion-text-wrap" (click)="updateItem(item)">
+              <!-- stopPropagation: ion-item would also pass this tap to the checkbox. -->
+              <ion-label class="ion-text-wrap" (click)="$event.stopPropagation(); rowTap(item)">
                 <h2 dir="auto">
                   @if (!shopping() && item.priority === 'high' && !item.state) {
                     <ion-icon class="flag" name="flag" aria-label="עדיפות גבוהה"></ion-icon>
+                  }
+                  @if (item.repeat && !item.state) {
+                    <ion-icon class="repeat" name="repeat" aria-label="משימה חוזרת"></ion-icon>
                   }
                   {{ item.name }}
                 </h2>
                 @if (item.description) {
                   <p dir="auto">{{ item.description }}</p>
+                }
+                @if (whoText(item); as who) {
+                  <p class="who">{{ who }}</p>
                 }
                 @if (dueText(item) || reminderText(item)) {
                   <p class="chips">
@@ -112,6 +162,27 @@
               @if (photoUrl(item); as photo) {
                 <ion-thumbnail slot="end"><img [src]="photo" alt="" /></ion-thumbnail>
               }
+              @if (shared() && member(item.assignee || item.by); as m) {
+                <span class="avatar" slot="end" aria-hidden="true">
+                  @if (m.photo) {
+                    <img [src]="m.photo" alt="" referrerpolicy="no-referrer" />
+                  } @else {
+                    {{ m.name.charAt(0) }}
+                  }
+                </span>
+              }
+              @if (shopping()) {
+                <ion-button
+                  slot="end"
+                  fill="clear"
+                  color="medium"
+                  class="edit"
+                  [attr.aria-label]="'עריכת ' + item.name"
+                  (click)="$event.stopPropagation(); updateItem(item)"
+                >
+                  <ion-icon slot="icon-only" name="create-outline" aria-hidden="true"></ion-icon>
+                </ion-button>
+              }
             </ion-item>
             <ion-item-options side="end">
               <ion-item-option color="danger" (click)="deleteItem(item)">
@@ -121,6 +192,7 @@
           </ion-item-sliding>
         }
       </ion-list>
+      }
     } @empty {
       @if (shopping()) {
         <app-empty-list

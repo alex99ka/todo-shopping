@@ -42,6 +42,17 @@
       }
     </ion-item>
 
+    @if (dueAt()) {
+      <ion-item>
+        <ion-select label="חזרה" labelPlacement="stacked" interface="popover" [(ngModel)]="repeat">
+          <ion-select-option value="">לא חוזרת</ion-select-option>
+          @for (r of repeats; track r[0]) {
+            <ion-select-option [value]="r[0]">{{ r[1] }}</ion-select-option>
+          }
+        </ion-select>
+      </ion-item>
+    }
+
     <ion-item>
       <ion-select label="עדיפות" labelPlacement="stacked" interface="popover" [(ngModel)]="priority">
         @for (p of priorities; track p[0]) {
@@ -49,6 +60,17 @@
         }
       </ion-select>
     </ion-item>
+
+    @if (members.length > 1) {
+      <ion-item>
+        <ion-select label="באחריות" labelPlacement="stacked" interface="popover" [(ngModel)]="assignee">
+          <ion-select-option value="">כל אחד</ion-select-option>
+          @for (m of members; track m.uid) {
+            <ion-select-option [value]="m.uid">{{ m.name }}</ion-select-option>
+          }
+        </ion-select>
+      </ion-item>
+    }
 
     <ion-item>
       <ion-input

@@ -4,8 +4,42 @@
       "collectionGroup": "items",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "reminded", "order": "ASCENDING" },
-        { "fieldPath": "remindAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "reminded",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "remindAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "items",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "state",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dueAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "listCreatedAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "count",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
@@ -14,10 +48,22 @@
       "collectionGroup": "items",
       "fieldPath": "date",
       "indexes": [
-        { "order": "ASCENDING", "queryScope": "COLLECTION" },
-        { "order": "DESCENDING", "queryScope": "COLLECTION" },
-        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
-        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
       ]
     }
   ]

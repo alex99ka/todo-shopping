@@ -168,6 +168,41 @@ service cloud.firestore {
                     || isSelfRemoval()
                     || isInvitedJoin('list', listId);
 
+      function listDoc() {
+        return get(/databases/$(database)/documents/lists/$(listId)).data;
+      }
+
+      // Same epoch binding as items: a list recreated under this id gets none of these.
+      function ofThisList(d) {
+        return d.listCreatedAt == listDoc().createdAt;
+      }
+
+      // Each member's name and photo, written by that member, so housemates can see
+      // who added, ticked or owns an item without making users/{uid} readable.
+      match /members/{uid} {
+        allow read: if canUseList(listDoc()) && ofThisList(resource.data);
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && canUseList(listDoc()) && ofThisList(request.resource.data)
+          && request.resource.data.keys().hasOnly(['name', 'photo', 'listCreatedAt'])
+          && request.resource.data.name is string && request.resource.data.name.size() <= 60
+          && request.resource.data.get('photo', '') is string
+          && request.resource.data.get('photo', '').size() <= 500;
+        allow delete: if signedIn() && request.auth.uid == uid;
+      }
+
+      // What has been added before, for quick-add suggestions. Keyed by the name.
+      match /history/{key} {
+        allow read: if canUseList(listDoc()) && ofThisList(resource.data);
+        allow create, update: if canUseList(listDoc()) && ofThisList(request.resource.data)
+          && request.resource.data.keys().hasOnly(['name', 'category', 'count', 'last', 'listCreatedAt'])
+          && request.resource.data.name is string && request.resource.data.name.size() <= 500
+          && request.resource.data.get('category', '') is string
+          && request.resource.data.get('category', '').size() <= 50
+          && request.resource.data.count is int && request.resource.data.count <= 1000000
+          && request.resource.data.last is number;
+        allow delete: if canUseList(listDoc()) && ofThisList(resource.data);
+      }
+
       match /items/{itemId} {
         function parent() {
           return get(/databases/$(database)/documents/lists/$(listId)).data;
@@ -184,7 +219,7 @@ service cloud.firestore {
           let d = request.resource.data;
           return d.keys().hasOnly(['name', 'state', 'description', 'date', 'listCreatedAt',
                                    'photoPath', 'category', 'remindAt', 'reminded', 'by',
-                                   'dueAt', 'priority'])
+                                   'dueAt', 'priority', 'repeat', 'doneBy', 'assignee'])
             && d.name is string && d.name.size() <= 500
             && d.description is string && d.description.size() <= 5000
             && d.state is bool
@@ -194,16 +229,28 @@ service cloud.firestore {
             && (d.get('remindAt', null) == null || d.remindAt is number)
             && d.get('reminded', false) is bool
             && (d.get('dueAt', null) == null || d.dueAt is number)
-            && d.get('priority', 'normal') in ['high', 'normal', 'low'];
+            && d.get('priority', 'normal') in ['high', 'normal', 'low']
+            && d.get('repeat', null) in [null, 'weekly', 'monthly']
+            && (d.get('assignee', null) == null
+                || (d.assignee is string && d.assignee.size() <= 128));
+        }
+
+        // doneBy is set only to yourself (or cleared); an unchanged value is kept.
+        function validDoneBy() {
+          let after = request.resource.data.get('doneBy', null);
+          return after == null || after == request.auth.uid
+            || (resource != null && after == resource.data.get('doneBy', null));
         }
 
         allow read: if canUseList(parent()) && sameEpoch(resource.data);
         allow create: if canUseList(parent()) && sameEpoch(request.resource.data) && validItem()
+          && validDoneBy()
           && request.resource.data.by == request.auth.uid;
         allow update: if canUseList(parent())
           && sameEpoch(resource.data)
           && sameEpoch(request.resource.data)
           && validItem()
+          && validDoneBy()
           && request.resource.data.get('by', null) == resource.data.get('by', null)
           && request.resource.data.date == resource.data.date;
         allow delete: if canUseList(parent()) && sameEpoch(resource.data);

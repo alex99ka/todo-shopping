@@ -1,7 +1,9 @@
 """Push notifier for Todo and Shopping.
 
 Firebase's free plan has no Cloud Functions, so this polls Firestore and sends
-the pushes itself: new items in a list, due reminders, and new releases.
+the pushes itself: new items in a list, due reminders, a morning summary of the
+day's tasks, and new releases. It also keeps lists in sync with Home Assistant
+(ha_sync.py) when HA_TOKEN and HA_SYNC are set.
 
   python notify.py             run forever
   python notify.py --once      one live cycle
@@ -16,16 +18,23 @@ import time
 import urllib.error
 import urllib.request
 import warnings
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import firebase_admin
 from firebase_admin import exceptions, firestore, messaging
 from google.api_core.exceptions import FailedPrecondition
 from google.cloud.firestore_v1.base_query import FieldFilter
 
+import ha_sync
+
 APP_URL = os.environ.get('APP_URL', 'https://alex-todo-shopping.web.app').rstrip('/')
 GITHUB_REPO = os.environ.get('GITHUB_REPO', 'alex99ka/todo-shopping')
 POLL_SECONDS = int(os.environ.get('POLL_SECONDS', '30'))
 RELEASE_EVERY_S = 3600
+# The morning summary goes out once a day from this hour, in this time zone.
+DIGEST_HOUR = int(os.environ.get('DIGEST_HOUR', '8'))
+TZ = ZoneInfo(os.environ.get('TIME_ZONE', 'Asia/Jerusalem'))
 # Items are re-scanned this far behind the cursor: `date` is the client's clock
 # and a write made offline (no signal in the shop) arrives late with an old date.
 LOOKBACK_MS = 10 * 60 * 1000
@@ -67,10 +76,35 @@ def same_epoch(item, lst):
     return lst is not None and item.get('listCreatedAt') == lst.get('createdAt')
 
 
-def display_name(user):
+def display_name(user, uid=None):
     # users/{uid} is written by its owner with no size limit; an oversized body
     # makes FCM answer INVALID_ARGUMENT, which would read as a dead token.
+    if uid == ha_sync.BY:
+        return 'Home Assistant'
     return str((user or {}).get('displayName') or 'מישהו')[:60]
+
+
+def digest_counts(rows, day_start, day_end):
+    """rows: (uids who should hear about it, dueAt) -> {uid: (overdue, today)}."""
+    out = {}
+    for uids, due in rows:
+        for uid in uids:
+            late, today = out.get(uid, (0, 0))
+            if due < day_start:
+                late += 1
+            elif due < day_end:
+                today += 1
+            out[uid] = (late, today)
+    return {uid: c for uid, c in out.items() if any(c)}
+
+
+def digest_text(late, today):
+    parts = []
+    if today:
+        parts.append('משימה אחת להיום' if today == 1 else f'{today} משימות להיום')
+    if late:
+        parts.append('אחת באיחור' if late == 1 else f'{late} באיחור')
+    return ' · '.join(parts)
 
 
 def group_new_items(items):
@@ -156,9 +190,9 @@ def new_items(db, st):
         group = [i for i in group if same_epoch(i, lst)]
         if not uids or not group:
             continue
-        user = db.collection('users').document(by).get().to_dict() if by else None
+        user = db.collection('users').document(by).get().to_dict() if by and by != ha_sync.BY else None
         names = [i.get('name') or '' for i in group]
-        send(tokens_of(db, uids), lst.get('name') or 'רשימה', added_text(display_name(user), names),
+        send(tokens_of(db, uids), lst.get('name') or 'רשימה', added_text(display_name(user, by), names),
              f'/details/{list_id}')
 
 
@@ -176,6 +210,46 @@ def reminders(db, st):
             if same_epoch(item, lst):
                 send(tokens_of(db, uids), 'תזכורת', item.get('name') or '', f'/details/{list_id}')
         s.reference.update({'reminded': True})
+
+
+def digest(db, st):
+    """Once a day after DIGEST_HOUR: each person's tasks due today and overdue.
+    A task with an assignee counts only for them."""
+    now = datetime.now(TZ)
+    day = now.date().isoformat()
+    if now.hour < DIGEST_HOUR or st.get('digest_day') == day:
+        return
+    st['digest_day'] = day
+    ref = db.document('notifier/state')
+    if (ref.get().to_dict() or {}).get('lastDigest') == day:
+        return
+    # Recorded before sending: a restart or a failure must not send it twice.
+    ref.set({'lastDigest': day}, merge=True)
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start = int(start.timestamp() * 1000)
+    day_end = int((start + timedelta(days=1)).timestamp() * 1000)
+    snaps = (db.collection_group('items')
+             .where(filter=FieldFilter('state', '==', False))
+             .where(filter=FieldFilter('dueAt', '<', day_end))
+             .stream())
+    lists, rows = {}, []
+    for s in snaps:
+        item = s.to_dict()
+        list_id = s.reference.parent.parent.id
+        if list_id not in lists:
+            lists[list_id] = members(db, list_id)
+        lst, uids = lists[list_id]
+        if not same_epoch(item, lst):
+            continue
+        who = {item['assignee']} & uids if item.get('assignee') in uids else uids
+        rows.append((who, item['dueAt']))
+    for uid, (late, today) in digest_counts(rows, day_start, day_end).items():
+        send(tokens_of(db, [uid]), 'בוקר טוב', digest_text(late, today), '/home')
+    log.info('digest %s sent', day)
+
+
+def ha(db, st):
+    ha_sync.sync(db, now_ms, st)
 
 
 def latest_release():
@@ -214,7 +288,7 @@ def release(db, st):
 
 
 def cycle(db, st):
-    for step in (new_items, reminders, release):
+    for step in (new_items, reminders, digest, release, ha):
         try:
             step(db, st)
         except FailedPrecondition as e:
@@ -239,6 +313,14 @@ def selftest():
     assert not same_epoch({'listCreatedAt': 'T0'}, None)
     assert display_name({'displayName': 'x' * 5000}) == 'x' * 60
     assert display_name(None) == 'מישהו'
+    assert display_name(None, 'home-assistant') == 'Home Assistant'
+
+    # Morning summary: per person; an item for someone in particular counts only for them.
+    rows = [({'a', 'b'}, 50), ({'a', 'b'}, 150), ({'b'}, 160), ({'a'}, 999)]
+    assert digest_counts(rows, 100, 200) == {'a': (1, 1), 'b': (1, 2)}
+    assert digest_text(1, 2) == '2 משימות להיום · אחת באיחור'
+    assert digest_text(0, 1) == 'משימה אחת להיום'
+    ha_sync.selftest()
 
     milk, eggs, bread, tea = ({'name': n, 'by': b} for n, b in
                               (('Milk', 'u1'), ('Eggs', 'u1'), ('Bread', 'u1'), ('Tea', 'u2')))

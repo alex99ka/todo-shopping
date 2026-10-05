@@ -9,6 +9,29 @@ versions reach installed apps as an in-app update.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-05
+
+### Added
+
+- The home screen shows what is waiting in each list: "5 לקנות", "2 באיחור · 1 היום".
+- Store mode: in a shopping list, tapping anything on a row ticks it (with a short
+  vibration where supported); the pencil opens the editor. The basket folds away.
+- Quick add takes several items at once (commas or one per line, as pasted from a
+  chat) and keeps amounts: "2 חלב", "חלב x2", "1 ק״ג עגבניות".
+- Suggestions under quick add: what this list had before, most frequent first; one
+  tap adds it again, in the aisle it had.
+- Repeating tasks (weekly or monthly): ticking one moves its deadline on.
+- A morning push at 08:00 with each person's tasks for today and overdue ones.
+- Shared lists show who added, bought or did each item, and tasks can be put in
+  someone's charge, with a "רק שלי" filter.
+- New users start with a shopping list and a task list.
+- Home Assistant sync (on the Pi notifier): a list stays in two-way sync with an HA
+  to-do entity such as the Shopping list, so voice and dashboards work with it.
+
+### Fixed
+
+- Tapping a task's name to open the editor also ticked it, and Cancel left it ticked.
+
 ## [1.2.0] - 2026-10-05
 
 ### Added
@@ -106,7 +129,8 @@ First release of Todo and Shopping, forked from
 - The non-working username/password and Facebook sign-in buttons (Google only).
 - The upstream site's Google Analytics snippet and the third-party avatar service.
 
-[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.2.0...HEAD
+[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.3.0...HEAD
+[1.3.0]: https://github.com/alex99ka/todo-shopping/compare/1.2.0...1.3.0
 [1.2.0]: https://github.com/alex99ka/todo-shopping/compare/1.1.2...1.2.0
 [1.1.2]: https://github.com/alex99ka/todo-shopping/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/alex99ka/todo-shopping/compare/1.1.0...1.1.1

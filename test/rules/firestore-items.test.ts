@@ -301,3 +301,54 @@ test('a task takes a deadline and a priority, checked for type', async () => {
     await assertFails(updateDoc(ref, { priority: 'urgent' }));
   });
 });
+
+test('a task can repeat weekly or monthly, nothing else', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const ref = doc(env.authenticatedContext(MEMBER).firestore(), 'lists/list-1/items/item-1');
+    await assertSucceeds(updateDoc(ref, { repeat: 'weekly' }));
+    await assertSucceeds(updateDoc(ref, { repeat: null }));
+    await assertFails(updateDoc(ref, { repeat: 'daily' }));
+  });
+});
+
+test('doneBy can only name yourself', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const ref = doc(env.authenticatedContext(MEMBER).firestore(), 'lists/list-1/items/item-1');
+    await assertFails(updateDoc(ref, { state: true, doneBy: OWNER }));
+    await assertSucceeds(updateDoc(ref, { state: true, doneBy: MEMBER }));
+    // The owner may edit the item without touching someone else's doneBy.
+    const asOwner = doc(env.authenticatedContext(OWNER).firestore(), 'lists/list-1/items/item-1');
+    await assertSucceeds(updateDoc(asOwner, { name: 'Oat milk' }));
+    await assertSucceeds(updateDoc(asOwner, { state: false, doneBy: null }));
+  });
+});
+
+test('members write only their own card, and only list users read cards', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const db = env.authenticatedContext(MEMBER).firestore();
+    await assertSucceeds(setDoc(doc(db, 'lists/list-1/members', MEMBER), { name: 'Dana', photo: '', listCreatedAt: T0 }));
+    await assertFails(setDoc(doc(db, 'lists/list-1/members', OWNER), { name: 'Fake', listCreatedAt: T0 }));
+    await assertFails(setDoc(doc(db, 'lists/list-1/members', MEMBER), { name: 'Dana', listCreatedAt: T1 }));
+    await assertFails(setDoc(doc(db, 'lists/list-1/members', MEMBER), { name: 'Dana', listCreatedAt: T0, role: 'x' }));
+    const cards = query(collection(db, 'lists/list-1/members'), where('listCreatedAt', '==', T0));
+    await assertSucceeds(getDocs(cards));
+    const stranger = env.authenticatedContext(STRANGER).firestore();
+    await assertFails(getDocs(query(collection(stranger, 'lists/list-1/members'), where('listCreatedAt', '==', T0))));
+  });
+});
+
+test('list users keep a history of names for suggestions', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const db = env.authenticatedContext(MEMBER).firestore();
+    const entry = { name: 'Milk', category: 'Dairy & Eggs', count: 1, last: 1000, listCreatedAt: T0 };
+    await assertSucceeds(setDoc(doc(db, 'lists/list-1/history/milk'), entry));
+    await assertFails(setDoc(doc(db, 'lists/list-1/history/milk'), { ...entry, count: 'many' }));
+    await assertFails(setDoc(doc(db, 'lists/list-1/history/milk'), { ...entry, listCreatedAt: T1 }));
+    const stranger = env.authenticatedContext(STRANGER).firestore();
+    await assertFails(setDoc(doc(stranger, 'lists/list-1/history/eggs'), { ...entry, name: 'Eggs' }));
+  });
+});

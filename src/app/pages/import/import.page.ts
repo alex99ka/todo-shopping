@@ -176,6 +176,7 @@ export class ImportPage {
             listCreatedAt: list.createdAt,
           }).catch(() => undefined);
         }
+        void this.lists.recordHistory(listId, list.createdAt, item.name, item.category).catch(() => undefined);
       }
       await this.router.navigateByUrl(`/details/${listId}`, { replaceUrl: true });
     } catch {

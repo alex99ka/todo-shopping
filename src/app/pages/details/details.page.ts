@@ -22,7 +22,6 @@ import {
   IonFabButton,
   IonHeader,
   IonIcon,
-  IonInput,
   IonItem,
   IonItemOption,
   IonItemOptions,
@@ -31,6 +30,7 @@ import {
   IonList,
   IonListHeader,
   IonProgressBar,
+  IonTextarea,
   IonThumbnail,
   IonTitle,
   IonToolbar,
@@ -44,9 +44,12 @@ import {
   basket,
   calendar,
   checkboxOutline,
+  chevronDown,
+  createOutline,
   ellipsisHorizontal,
   ellipsisVertical,
   flag,
+  repeat,
   send,
   trash,
 } from 'ionicons/icons';
@@ -61,11 +64,17 @@ import {
 import {
   CATEGORIES,
   CATEGORY_LABELS,
+  HistoryEntry,
   Household,
   Item,
+  MemberCard,
   TodoList,
+  completion,
   guessAisle,
+  historyKey,
   isShopping,
+  parseEntry,
+  splitEntries,
 } from '../../models';
 import { AlertService, EmptyListComponent } from '../../shared';
 import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
@@ -86,7 +95,6 @@ import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
     IonFabButton,
     IonHeader,
     IonIcon,
-    IonInput,
     IonItem,
     IonItemOption,
     IonItemOptions,
@@ -95,6 +103,7 @@ import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
     IonList,
     IonListHeader,
     IonProgressBar,
+    IonTextarea,
     IonThumbnail,
     IonTitle,
     IonToolbar,
@@ -111,7 +120,8 @@ export class DetailsPage {
   private readonly households = inject(HouseholdService);
   private readonly invites = inject(InviteService);
   private readonly router = inject(Router);
-  private readonly uid = inject(AuthService).uid;
+  private readonly auth = inject(AuthService);
+  protected readonly uid = this.auth.uid;
 
   private readonly listId = inject(ActivatedRoute).snapshot.paramMap.get('listId') ?? '';
   private readonly list$ = this.todoListService
@@ -127,6 +137,45 @@ export class DetailsPage {
     ),
     { initialValue: [] },
   );
+  protected readonly members = toSignal(
+    this.list$.pipe(
+      switchMap((list) =>
+        list
+          ? this.todoListService.members$(this.listId, list.createdAt)
+          : of<Record<string, MemberCard>>({}),
+      ),
+    ),
+    { initialValue: {} as Record<string, MemberCard> },
+  );
+  private readonly history = toSignal(
+    this.list$.pipe(
+      switchMap((list) =>
+        list ? this.todoListService.history$(this.listId, list.createdAt) : of<HistoryEntry[]>([]),
+      ),
+    ),
+    { initialValue: [] },
+  );
+  /** Names and avatars only matter once someone else can see the list. */
+  protected readonly shared = computed(() => Object.keys(this.members()).length > 1);
+  protected readonly basketOpen = signal(false);
+  protected readonly mineOnly = signal(false);
+  protected readonly quickFocused = signal(false);
+
+  /**
+   * Under the quick-add field: names added before that are not open on the list now,
+   * matching what is being typed, or the most frequent ones while the field is empty.
+   */
+  protected readonly suggestions = computed(() => {
+    const open = new Set(this.items().filter((i) => !i.state).map((i) => historyKey(i.name)));
+    const typed = this.quickName().trim().toLowerCase();
+    if (!typed && !this.quickFocused()) {
+      return [];
+    }
+    return this.history()
+      .filter((h) => !open.has(h.id) && (!typed || h.name.toLowerCase().includes(typed)))
+      .filter((h) => h.name.toLowerCase() !== typed)
+      .slice(0, 8);
+  });
 
   protected readonly shopping = computed(() => {
     const list = this.todoList();
@@ -142,13 +191,15 @@ export class DetailsPage {
   // Shopping: what is still to buy in aisle order, then everything already in
   // the basket. Tasks: by deadline (overdue, today, later, none), then done.
   protected readonly groups = computed(() => {
-    const items = this.items();
+    const mine = this.mineOnly();
+    const items = this.items().filter((i) => !mine || i.assignee === this.uid);
     const open = items.filter((i) => !i.state);
     const done = items.filter((i) => i.state);
     const groups: { key: string; title: string; items: Item[] }[] = [];
     if (this.shopping()) {
+      // Items with no aisle (added from Home Assistant, say) get one from their name.
       const aisle = (i: Item) =>
-        (CATEGORIES as readonly string[]).includes(i.category ?? '') ? i.category : 'Other';
+        (CATEGORIES as readonly string[]).includes(i.category ?? '') ? i.category : guessAisle(i.name);
       for (const category of CATEGORIES) {
         const inAisle = open.filter((i) => aisle(i) === category);
         groups.push({ key: category, title: CATEGORY_LABELS[category], items: byName(inAisle) });
@@ -178,6 +229,9 @@ export class DetailsPage {
 
   constructor() {
     addIcons({
+      chevronDown,
+      createOutline,
+      repeat,
       add,
       alarm,
       basket,
@@ -188,6 +242,15 @@ export class DetailsPage {
       flag,
       send,
       trash,
+    });
+    // Put your name and photo on the list (once, or when they change).
+    effect(() => {
+      const list = this.todoList();
+      const me = this.auth.currentUser;
+      const card = me && this.members()[me.uid];
+      if (list?.createdAt && me && (!card || card.name !== me.displayName || card.photo !== me.photoURL)) {
+        untracked(() => void this.todoListService.saveMemberCard(this.listId, list.createdAt, me).catch(() => undefined));
+      }
     });
     effect(() => {
       const wanted = this.photoPaths(this.items());
@@ -213,12 +276,36 @@ export class DetailsPage {
 
   protected toggleItem(item: Item): void {
     const { name, description, date } = item;
-    void this.todoListService.updateItem(this.listId, item.id, {
-      name,
-      description,
-      date,
-      state: !item.state,
-    });
+    const changes = completion(item, !item.state, this.uid);
+    void this.todoListService
+      .updateItem(this.listId, item.id, { name, description, date, state: item.state, ...changes })
+      .catch(() => this.alert.presentToast('משהו השתבש'));
+    // A short buzz confirms the tick without looking (no-op where unsupported).
+    navigator.vibrate?.(15);
+    if (changes.dueAt) {
+      const when = new Date(changes.dueAt).toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short' });
+      void this.toast(`"${item.name}" הועבר ל־${when}`, 2000);
+    }
+  }
+
+  /** Store mode: in a shopping list the whole row ticks; editing is the pencil. */
+  protected rowTap(item: Item): void {
+    if (this.shopping()) {
+      this.toggleItem(item);
+    } else {
+      this.updateItem(item);
+    }
+  }
+
+  protected memberName(uid: string | null | undefined): string {
+    if (!uid) return '';
+    if (uid === this.uid) return 'אני';
+    if (uid === 'home-assistant') return 'Home Assistant';
+    return this.members()[uid]?.name ?? '';
+  }
+
+  protected member(uid: string | null | undefined): MemberCard | undefined {
+    return uid ? this.members()[uid] : undefined;
   }
 
   protected deleteItem(item: Item): void {
@@ -229,28 +316,72 @@ export class DetailsPage {
    * Type and press Enter: no editor. A shopping item lands in the aisle it had the
    * last time, else the one its name suggests; the toast says which.
    */
-  protected quickAdd(): void {
-    const name = this.quickName().trim();
+  /**
+   * Type and press Enter: no editor. Several items at once split on commas or lines
+   * (a list pasted from a chat), and "2 חלב" / "חלב x2" keep the amount. A shopping
+   * item lands in the aisle that name had before, else the one its name suggests.
+   */
+  protected quickAdd(event?: Event): void {
+    event?.preventDefault();
+    const entries = splitEntries(this.quickName()).map(parseEntry).filter((e) => e.name);
     const list = this.todoList();
-    if (!name || !list?.createdAt) {
+    if (!entries.length || !list?.createdAt) {
       return;
     }
-    const same = this.items().find((i) => i.name.trim() === name && i.category);
-    const category = this.shopping() ? (same?.category ?? guessAisle(name)) : undefined;
+    const aisles = new Set<string>();
+    for (const { name, quantity } of entries) {
+      const category = this.addOne(name, quantity);
+      if (category) aisles.add(CATEGORY_LABELS[category] ?? category);
+    }
+    this.quickName.set('');
+    if (entries.length > 1) {
+      void this.toast(`נוספו ${entries.length} פריטים`, 1500);
+    } else if (aisles.size) {
+      void this.toast(`נוסף ל"${[...aisles][0]}"`, 1500);
+    }
+  }
+
+  // Blur comes before a suggestion's click; wait so the tap still lands.
+  protected blurQuick(): void {
+    setTimeout(() => this.quickFocused.set(false), 250);
+  }
+
+  /** "Bought by", "for" or "added by", only on lists more than one person uses. */
+  protected whoText(item: Item): string {
+    if (!this.shared()) return '';
+    if (item.state && item.doneBy) {
+      return `${this.shopping() ? 'נקנה' : 'בוצע'} ע״י ${this.memberName(item.doneBy)}`;
+    }
+    if (!item.state && item.assignee) return `באחריות ${this.memberName(item.assignee)}`;
+    if (!item.state && item.by && item.by !== this.uid && this.memberName(item.by)) {
+      return `נוסף ע״י ${this.memberName(item.by)}`;
+    }
+    return '';
+  }
+
+  protected addSuggestion(entry: HistoryEntry): void {
+    this.addOne(entry.name, '', entry.category);
+    this.quickName.set('');
+  }
+
+  /** Creates the item and counts it in the history; returns the aisle it went to. */
+  private addOne(name: string, quantity: string, known?: string): string | undefined {
+    const list = this.todoList();
+    if (!list?.createdAt) return undefined;
+    const past = this.history().find((h) => h.id === historyKey(name));
+    const category = this.shopping() ? (known ?? past?.category ?? guessAisle(name)) : undefined;
     void this.todoListService
       .createItem(this.listId, this.todoListService.newItemId(this.listId), {
         name,
         state: false,
-        description: '',
+        description: quantity,
         date: Date.now(),
         listCreatedAt: list.createdAt,
         ...(category && { category }),
       })
       .catch(() => this.alert.presentToast('ההוספה נכשלה'));
-    this.quickName.set('');
-    if (category) {
-      void this.toast(`נוסף ל"${CATEGORY_LABELS[category] ?? category}"`, 1500);
-    }
+    void this.todoListService.recordHistory(this.listId, list.createdAt, name, category).catch(() => undefined);
+    return category;
   }
 
   /** The ⋯ on a section heading: tick off, put back or empty the whole section. */
@@ -490,6 +621,7 @@ export class DetailsPage {
         listCreatedAt: list.createdAt,
         item,
         shopping: this.shopping(),
+        members: Object.values(this.members()),
       },
     });
     await modal.present();

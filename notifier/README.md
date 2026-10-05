@@ -4,6 +4,8 @@ Firebase's free Spark plan has no Cloud Functions, so this small Python service 
 
 - **New items**: one push per list (and per person who added items) to everyone who can see the list, except the person who added them. The title is the list name and the body reads like `Alex added "Milk"` or `Alex added 12 items`.
 - **Reminders**: items whose `remindAt` has passed get a `Reminder` push to every member, unless the item is already done. Then `reminded` is set to true.
+- **Morning summary**: once a day from 08:00 (`DIGEST_HOUR`, `TIME_ZONE`), each person gets one push with their tasks due today and overdue. A task with an assignee counts only for them. The day is recorded in `notifier/state` first, so a restart never sends it twice.
+- **Home Assistant** (`ha_sync.py`, optional): keeps app lists in two-way sync with HA to-do entities. See below.
 - **New release**: about once an hour it checks GitHub's latest release. When the tag changes, it pushes `Update available` to every device. The first run only records the current tag.
 
 Tapping a push opens the list (or Settings, for an update). Tokens that FCM reports as dead are deleted.
@@ -31,11 +33,25 @@ docker compose logs -f        # expect "started: project alex-todo-shopping, pol
 
 The container runs as uid 1000, the Pi's first user (`alex99ka`). If `id -u` on the Pi prints something else, change the `useradd --uid` line in the Dockerfile, or the key will not be readable.
 
-To ship a new `notify.py`, copy it over and run `docker compose up -d --build` again. Settings live in `docker-compose.yml`: `APP_URL`, `GITHUB_REPO`, `POLL_SECONDS`, and `GOOGLE_APPLICATION_CREDENTIALS`.
+To ship a new `notify.py`, copy it over and run `docker compose up -d --build` again. Settings live in `docker-compose.yml`: `APP_URL`, `GITHUB_REPO`, `POLL_SECONDS`, and `GOOGLE_APPLICATION_CREDENTIALS`. Optional: `DIGEST_HOUR` (8) and `TIME_ZONE` (Asia/Jerusalem); the Home Assistant settings go in `.env`.
 
 On a restart, the service skips items added while it was down. It never replays history.
 It re-checks the last 10 minutes on every poll, so an item saved offline (no signal in the
 shop) still announces itself when it syncs, and nothing is announced twice.
+
+## Home Assistant sync
+
+Pairs an app list with an HA to-do entity, such as the built-in Shopping list (`todo.shopping_list`) or a Local To-do list. Whatever is added, renamed, ticked or deleted on one side shows up on the other within one poll: "Hey Google / Assist, add milk to the shopping list" lands in the app, and the app's list shows on HA dashboards and in automations. Only names and ticks cross over. Items from HA get their aisle from their name in the app. When both sides change the same item between polls, the app wins. The last synced state lives in Firestore at `notifier/ha-<listId>`.
+
+It is off until `~/todo-notifier/.env` exists on the Pi:
+
+```sh
+HA_TOKEN=<long-lived access token>      # HA: your profile > Security > Long-lived access tokens
+HA_SYNC=<app list id>=todo.shopping_list # several: L1=todo.a,L2=todo.b
+# HA_URL=http://127.0.0.1:8123          # default; the notifier runs with host networking
+```
+
+The list id is the last part of the list's address in the app (`/details/<id>`). Then run `chmod 600 .env && docker compose up -d`. Keep `.env` out of the repo, since the token is a full HA login.
 
 ## Run locally
 

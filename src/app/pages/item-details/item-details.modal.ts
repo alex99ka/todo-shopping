@@ -29,14 +29,17 @@ import {
 import type { Timestamp } from 'firebase/firestore';
 import { addIcons } from 'ionicons';
 import { camera, close, image as imageIcon, mic, trash } from 'ionicons/icons';
-import { PhotoService, TodoListService } from '../../core';
+import { AuthService, PhotoService, TodoListService } from '../../core';
 import {
   CATEGORIES,
   CATEGORY_LABELS,
   Item,
   ItemChanges,
+  MemberCard,
   PRIORITY_LABELS,
   Priority,
+  REPEAT_LABELS,
+  Repeat,
   newItem,
 } from '../../models';
 import { AlertService, MediaService, SpeechService } from '../../shared';
@@ -73,12 +76,17 @@ export class ItemDetailsModalComponent implements OnInit {
   listCreatedAt?: Timestamp;
   item?: Item;
   shopping = false;
+  /** Who can be put in charge: everyone who has opened the list. */
+  members: MemberCard[] = [];
 
   protected readonly categories = CATEGORIES;
   protected readonly categoryLabels = CATEGORY_LABELS;
   protected readonly priorities = Object.entries(PRIORITY_LABELS) as [Priority, string][];
   protected readonly category = signal('Other');
   protected readonly priority = signal<Priority>('normal');
+  protected readonly repeats = Object.entries(REPEAT_LABELS) as [Repeat, string][];
+  protected readonly repeat = signal<Repeat | ''>('');
+  protected readonly assignee = signal('');
   /** 'YYYY-MM-DD', as <input type="date"> wants it. */
   protected readonly dueAt = signal('');
   /** 'YYYY-MM-DDTHH:mm' in local time, as <input type="datetime-local"> wants it. */
@@ -96,6 +104,7 @@ export class ItemDetailsModalComponent implements OnInit {
 
   private readonly modalCtrl = inject(ModalController);
   private readonly todoLists = inject(TodoListService);
+  private readonly uid = inject(AuthService).uid;
   private readonly photos = inject(PhotoService);
   private readonly alert = inject(AlertService);
   private readonly media = inject(MediaService);
@@ -120,6 +129,8 @@ export class ItemDetailsModalComponent implements OnInit {
     this.remindAt.set(this.item?.remindAt ? toLocalInput(this.item.remindAt) : '');
     this.dueAt.set(this.item?.dueAt ? toLocalInput(this.item.dueAt).slice(0, 10) : '');
     this.priority.set(this.item?.priority ?? 'normal');
+    this.repeat.set(this.item?.repeat ?? '');
+    this.assignee.set(this.item?.assignee ?? '');
     this.date = seed.date;
     this.itemId = this.item?.id ?? this.todoLists.newItemId(this.listId);
     const path = this.item?.photoPath;
@@ -189,6 +200,8 @@ export class ItemDetailsModalComponent implements OnInit {
     const changes: ItemChanges = {
       name: this.name(),
       state: this.state(),
+      // Ticked here counts as ticked by you; an unchanged tick keeps who did it.
+      ...(this.state() !== (existing?.state ?? false) && { doneBy: this.state() ? this.uid : null }),
       description: this.description(),
       // A new item is dated when saved, not when this editor opened: the notifier
       // finds new items by date, so a stale one could slip under its cursor.
@@ -199,6 +212,9 @@ export class ItemDetailsModalComponent implements OnInit {
       // 'YYYY-MM-DD' alone parses as UTC; with a time it is local midnight.
       changes.dueAt = this.dueAt() ? new Date(`${this.dueAt()}T00:00`).getTime() : null;
       changes.priority = this.priority();
+      // Repeating needs a deadline to move on from.
+      changes.repeat = (this.dueAt() && this.repeat()) || null;
+      changes.assignee = this.assignee() || null;
       const at = this.remindAt() ? new Date(this.remindAt()).getTime() : null;
       // Only touch the reminder when it changed, so editing the text of an item
       // whose reminder already fired does not fire it again.
@@ -215,6 +231,11 @@ export class ItemDetailsModalComponent implements OnInit {
         ? this.todoLists.updateItem(this.listId, existing.id, changes)
         : this.todoLists.createItem(this.listId, this.itemId, { ...changes, listCreatedAt });
       write.catch(() => this.alert.presentToast('השמירה נכשלה'));
+      if (!existing) {
+        void this.todoLists
+          .recordHistory(this.listId, listCreatedAt, changes.name, changes.category)
+          .catch(() => undefined);
+      }
       await this.alert.presentToast(successToast);
       await this.dismiss(true);
       return;

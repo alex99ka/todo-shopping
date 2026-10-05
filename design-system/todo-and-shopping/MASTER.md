@@ -255,3 +255,8 @@ Before delivering any UI code, verify:
 - **Section actions.** Every section heading has a ⋯ (44px) with: tick off / put back the whole section, and empty it. The list's ⋮ menu has "empty list" and "clear checked".
 - **Undo, not confirm, for item deletes.** Single, section, checked or whole-list deletes happen at once in one batch and show a 5s toast with "ביטול" that restores them. Confirm dialogs stay only for deleting a list or household, which undo cannot restore.
 - **Toast actions** use `#6ee7b7` on the dark toast (primary green there is under 3:1).
+- **Store mode (shopping).** The whole row ticks; a pencil (44px) opens the editor. Row taps call `stopPropagation`, because `ion-item` also forwards any tap to its checkbox. The basket section folds (closed by default).
+- **Home rows say what is waiting**, not when the list was made: "5 לקנות", "2 באיחור · 1 היום" (late in danger ink), "ריקה", "הכול בוצע".
+- **People appear only on shared lists** (more than one member card): a 28px avatar at the row end, and one quiet line: "נקנה ע״י", "בוצע ע״י", "באחריות", "נוסף ע״י".
+- **Suggestions** are 36px pill buttons under quick add, scrolling sideways; shown while typing (matches) or on focus (most frequent).
+

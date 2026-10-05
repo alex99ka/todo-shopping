@@ -3,6 +3,10 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocsFromServer,
+  increment,
+  limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -13,7 +17,18 @@ import {
 } from 'firebase/firestore';
 import { collectionData, docData } from 'rxfire/firestore';
 import { Observable, catchError, combineLatest, map, of, retry, switchMap } from 'rxjs';
-import { Household, Item, ItemChanges, ListKind, TodoList } from '../models';
+import {
+  HistoryEntry,
+  Household,
+  Item,
+  ItemChanges,
+  ListKind,
+  MemberCard,
+  TodoList,
+  User,
+  completion,
+  historyKey,
+} from '../models';
 import { AuthService } from './auth.service';
 import { HouseholdService, leave } from './household.service';
 import { FIRESTORE } from './firebase.providers';
@@ -62,6 +77,16 @@ export class TodoListService {
     return combineLatest([direct, viaHouseholds]).pipe(
       map(([a, b]) => [...new Map([...a, ...b].map((l) => [l.id, l])).values()]),
     );
+  }
+
+  /** Asks the server, not the cache: a new device's empty cache proves nothing. */
+  async hasNoListsOnServer(): Promise<boolean> {
+    const uid = this.auth.uid;
+    if (!uid) return false;
+    const snap = await getDocsFromServer(
+      query(collection(this.db, 'lists'), where('memberUids', 'array-contains', uid), limit(1)),
+    );
+    return snap.empty;
   }
 
   list$(listId: string): Observable<TodoList | null> {
@@ -162,15 +187,69 @@ export class TodoListService {
   restoreItems(listId: string, items: Item[]): Promise<void> {
     const batch = writeBatch(this.db);
     for (const { id, ...item } of items) {
-      batch.set(this.itemRef(listId, id), { ...item, by: this.auth.uid });
+      // doneBy may only name yourself, so someone else's tick comes back unattributed.
+      const doneBy = item.doneBy === this.auth.uid ? item.doneBy : null;
+      batch.set(this.itemRef(listId, id), { ...item, doneBy, by: this.auth.uid });
     }
     return batch.commit();
   }
 
-  setItemsState(listId: string, items: Item[], state: boolean): Promise<void> {
+  /** Tick or untick in one batch; repeating tasks move to their next deadline instead. */
+  setItemsState(listId: string, items: Item[], done: boolean): Promise<void> {
     const batch = writeBatch(this.db);
-    items.forEach((i) => batch.update(this.itemRef(listId, i.id), { state }));
+    items.forEach((i) => batch.update(this.itemRef(listId, i.id), completion(i, done, this.auth.uid)));
     return batch.commit();
+  }
+
+  members$(listId: string, listCreatedAt: Timestamp): Observable<Record<string, MemberCard>> {
+    return (
+      collectionData(
+        query(collection(this.db, 'lists', listId, 'members'), where('listCreatedAt', '==', listCreatedAt)),
+        { idField: 'uid' },
+      ) as Observable<MemberCard[]>
+    ).pipe(
+      map((cards) => Object.fromEntries(cards.map((c) => [c.uid, c]))),
+      catchError(() => of({})),
+    );
+  }
+
+  /** Your name and photo on this list, so housemates see who did what. */
+  saveMemberCard(listId: string, listCreatedAt: Timestamp, user: User): Promise<void> {
+    return setDoc(doc(this.db, 'lists', listId, 'members', user.uid), {
+      name: (user.displayName || user.email.split('@')[0]).slice(0, 60),
+      photo: (user.photoURL ?? '').slice(0, 500),
+      listCreatedAt,
+    });
+  }
+
+  // ponytail: the top 100 by count; a household's real vocabulary is far smaller.
+  history$(listId: string, listCreatedAt: Timestamp): Observable<HistoryEntry[]> {
+    return (
+      collectionData(
+        query(
+          collection(this.db, 'lists', listId, 'history'),
+          where('listCreatedAt', '==', listCreatedAt),
+          orderBy('count', 'desc'),
+          limit(100),
+        ),
+        { idField: 'id' },
+      ) as Observable<HistoryEntry[]>
+    ).pipe(catchError(() => of<HistoryEntry[]>([])));
+  }
+
+  /** Counts a name in the list's history. Not awaited by callers, so it works offline. */
+  recordHistory(listId: string, listCreatedAt: Timestamp, name: string, category?: string): Promise<void> {
+    return setDoc(
+      doc(this.db, 'lists', listId, 'history', historyKey(name)),
+      {
+        name: name.trim(),
+        ...(category && { category }),
+        count: increment(1),
+        last: Date.now(),
+        listCreatedAt,
+      },
+      { merge: true },
+    );
   }
 
   private itemRef(listId: string, itemId: string) {

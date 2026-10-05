@@ -32,9 +32,19 @@ import {
   personAdd,
   trash,
 } from 'ionicons/icons';
+import { catchError, combineLatest, firstValueFrom, map, of, switchMap } from 'rxjs';
 import { AuthService, HouseholdService, InviteService, TodoListService } from '../../core';
-import { Household, ListKind, SHOPPING_LIST, TodoList, isShopping } from '../../models';
-import { DateCreatedPipe } from '../../pipes';
+import { Household, Item, ListKind, SHOPPING_LIST, TodoList, isShopping } from '../../models';
+
+interface Summary {
+  open: number;
+  overdue: number;
+  today: number;
+  total: number;
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+const SEEDED_KEY = 'starter-lists-created';
 import { AlertService, EmptyListComponent, NavBarComponent } from '../../shared';
 
 interface Section {
@@ -67,7 +77,6 @@ interface Section {
     IonSpinner,
     NavBarComponent,
     EmptyListComponent,
-    DateCreatedPipe,
   ],
 })
 export class HomePage {
@@ -80,6 +89,26 @@ export class HomePage {
 
   protected readonly uid = inject(AuthService).uid;
   protected readonly lists = toSignal(this.todoListService.lists$());
+  /** What is waiting in each list, so the home screen answers "anything to do?". */
+  protected readonly summaries = toSignal(
+    this.todoListService.lists$().pipe(
+      switchMap((lists) => {
+        const ready = lists.filter((l) => l.createdAt);
+        return ready.length
+          ? combineLatest(
+              ready.map((l) =>
+                this.todoListService.items$(l.id, l.createdAt).pipe(
+                  map((items) => [l.id, summarize(items)] as const),
+                  catchError(() => of([l.id, null] as const)),
+                ),
+              ),
+            )
+          : of([]);
+      }),
+      map((pairs) => Object.fromEntries(pairs) as Record<string, Summary | null>),
+    ),
+    { initialValue: {} as Record<string, Summary | null> },
+  );
   protected readonly households = toSignal(this.householdService.households$(), {
     initialValue: [],
   });
@@ -123,6 +152,46 @@ export class HomePage {
 
   constructor() {
     addIcons({ add, basket, checkboxOutline, create, exit, home, lockClosed, people, personAdd, trash });
+    void this.createStarterLists();
+  }
+
+  protected summaryText(list: TodoList): { text: string; late: boolean } {
+    const s = this.summaries()[list.id];
+    if (!s) return { text: isShopping(list) ? 'קניות' : 'משימות', late: false };
+    if (!s.total) return { text: 'ריקה', late: false };
+    if (isShopping(list)) {
+      return { text: s.open ? `${s.open} לקנות` : 'הכול בסל', late: false };
+    }
+    const parts = [s.overdue && `${s.overdue} באיחור`, s.today && `${s.today} היום`].filter(Boolean);
+    if (parts.length) return { text: parts.join(' · '), late: s.overdue > 0 };
+    return { text: s.open ? `${s.open} פתוחות` : 'הכול בוצע', late: false };
+  }
+
+  /**
+   * A new user starts with a shopping list and a task list instead of an empty
+   * screen. Only when the server confirms there is nothing (the local cache can be
+   * empty on a new device) and you are in no household, and only once per device.
+   */
+  private async createStarterLists(): Promise<void> {
+    try {
+      if (localStorage.getItem(SEEDED_KEY)) return;
+    } catch {
+      return;
+    }
+    if (!navigator.onLine) return;
+    try {
+      const [none, households] = await Promise.all([
+        this.todoListService.hasNoListsOnServer(),
+        firstValueFrom(this.householdService.households$()),
+      ]);
+      localStorage.setItem(SEEDED_KEY, '1');
+      if (none && !households.length) {
+        await this.todoListService.createList(SHOPPING_LIST, 'shopping');
+        await this.todoListService.createList('משימות', 'todo');
+      }
+    } catch {
+      return;
+    }
   }
 
   protected toggleSearchBar(): void {
@@ -232,4 +301,17 @@ export class HomePage {
         this.todoListService.renameList(todoList.id, (data?.['name'] ?? '').trim() || todoList.name),
     });
   }
+}
+
+function summarize(items: Item[]): Summary {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = today.getTime();
+  const open = items.filter((i) => !i.state);
+  return {
+    total: items.length,
+    open: open.length,
+    overdue: open.filter((i) => i.dueAt && i.dueAt < start).length,
+    today: open.filter((i) => i.dueAt && i.dueAt >= start && i.dueAt < start + DAY).length,
+  };
 }

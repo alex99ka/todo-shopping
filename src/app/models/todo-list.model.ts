@@ -18,6 +18,30 @@ export interface Item {
   dueAt?: number | null;
   /** Tasks only. */
   priority?: Priority;
+  /** Tasks with a deadline: ticking one off moves the deadline on instead of finishing it. */
+  repeat?: Repeat | null;
+  /** Uid of whoever ticked it off. */
+  doneBy?: string | null;
+  /** Tasks only: uid of the household member it is for. */
+  assignee?: string | null;
+}
+
+export type Repeat = 'weekly' | 'monthly';
+
+/** lists/{id}/members/{uid}: written by each member when they open the list. */
+export interface MemberCard {
+  uid: string;
+  name: string;
+  photo?: string;
+}
+
+/** lists/{id}/history/{key}: what was added before, for suggestions. */
+export interface HistoryEntry {
+  id: string;
+  name: string;
+  category?: string;
+  count: number;
+  last: number;
 }
 
 export type Priority = 'high' | 'normal' | 'low';
@@ -64,7 +88,20 @@ export interface Invite {
 }
 
 export type ItemChanges = Pick<Item, 'name' | 'state' | 'description' | 'date'> &
-  Partial<Pick<Item, 'photoPath' | 'category' | 'remindAt' | 'reminded' | 'dueAt' | 'priority'>>;
+  Partial<
+    Pick<
+      Item,
+      | 'photoPath'
+      | 'category'
+      | 'remindAt'
+      | 'reminded'
+      | 'dueAt'
+      | 'priority'
+      | 'repeat'
+      | 'doneBy'
+      | 'assignee'
+    >
+  >;
 
 /** Default name of a new shopping list. */
 export const SHOPPING_LIST = 'קניות';
@@ -100,6 +137,11 @@ export const CATEGORY_LABELS: Record<string, string> = {
   Drinks: 'משקאות',
   Household: 'ניקיון ובית',
   Other: 'אחר',
+};
+
+export const REPEAT_LABELS: Record<Repeat, string> = {
+  weekly: 'כל שבוע',
+  monthly: 'כל חודש',
 };
 
 export const PRIORITY_LABELS: Record<Priority, string> = {

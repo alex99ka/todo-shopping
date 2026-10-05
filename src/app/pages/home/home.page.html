@@ -24,7 +24,8 @@
               </span>
               <ion-label>
                 <h2>{{ todoList.name }}</h2>
-                <p>{{ isShopping(todoList) ? 'קניות' : 'משימות' }} · נוצרה {{ todoList.date | dateCreated }}</p>
+                @let s = summaryText(todoList);
+                <p class="status" [class.late]="s.late">{{ s.text }}</p>
               </ion-label>
             </ion-item>
             <ion-item-options side="end">
