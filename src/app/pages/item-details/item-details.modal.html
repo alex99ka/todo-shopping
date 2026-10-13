@@ -116,6 +116,10 @@
   </ion-item>
 
   @if (item) {
+    <ion-button class="copy" fill="clear" expand="block" (click)="copy()">
+      <ion-icon slot="start" name="copy-outline" aria-hidden="true"></ion-icon>
+      גם ברשימות אחרות…
+    </ion-button>
     <ion-button class="delete" fill="clear" color="danger" expand="block" (click)="remove()">
       <ion-icon slot="start" name="trash" aria-hidden="true"></ion-icon>
       {{ shopping ? 'מחיקת הפריט' : 'מחיקת המשימה' }}

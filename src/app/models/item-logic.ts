@@ -107,25 +107,26 @@ export function formatAmount({ value, unit }: Amount): string {
   return `${Math.round(value * 100) / 100} ${UNIT_LABELS[unit]}`;
 }
 
-/**
- * The amount of several lines for the same thing: "400 גרם" + "0.7 ק״ג" -> "1.1 ק״ג".
- * Amounts that do not add up (other units, free text) are kept side by side with "+".
- */
-export function joinAmounts(texts: string[]): string {
+/** The sum of amounts for the same thing ("400 גרם" + "0.7 ק״ג" -> "1.1 ק״ג"); null when they do not add up. */
+export function addAmounts(texts: string[]): string | null {
   const parts = texts.map((t) => t.trim()).filter(Boolean);
+  if (parts.length < 2) return parts.join('');
   const amounts = parts.map(parseAmount).filter((a) => a !== null);
   const mass = (a: Amount) => a.unit === 'g' || a.unit === 'kg';
   const [first] = amounts;
-  const addable =
-    parts.length > 1 &&
-    amounts.length === parts.length &&
-    amounts.every((a) => (mass(a) ? mass(first) : a.unit === first.unit));
-  if (!addable) return parts.join(' + ');
+  if (amounts.length < parts.length || !amounts.every((a) => (mass(a) ? mass(first) : a.unit === first.unit))) {
+    return null;
+  }
   if (mass(first)) {
     const grams = amounts.reduce((sum, a) => sum + a.value * (a.unit === 'kg' ? 1000 : 1), 0);
     return formatAmount(grams >= 1000 ? { value: grams / 1000, unit: 'kg' } : { value: grams, unit: 'g' });
   }
   return formatAmount({ value: amounts.reduce((sum, a) => sum + a.value, 0), unit: first.unit });
+}
+
+/** Like addAmounts, but amounts that do not add up (other units, free text) are kept side by side with "+". */
+export function joinAmounts(texts: string[]): string {
+  return addAmounts(texts) ?? texts.map((t) => t.trim()).filter(Boolean).join(' + ');
 }
 
 /** Open items that share a name (case and spacing aside), oldest first in each group. */

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  addAmounts,
   completion,
   duplicateGroups,
   historyKey,
@@ -66,6 +67,8 @@ test('joining lines adds up what can be added', () => {
   assert.equal(joinAmounts(['', '']), '');
   assert.equal(joinAmounts(['400 גרם', '2 יח׳']), '400 גרם + 2 יח׳');
   assert.equal(joinAmounts(['2 כפות', '1 כף']), '2 כפות + 1 כף');
+  assert.equal(addAmounts(['400 גרם', '2 יח׳']), null);
+  assert.equal(addAmounts(['', '2 יח׳']), '2 יח׳');
 });
 
 test('duplicates are open items with the same name, oldest first', () => {

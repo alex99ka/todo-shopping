@@ -177,7 +177,7 @@ export class ImportPage {
   private readonly houses = toSignal(this.households.households$(), { initialValue: [] });
   private readonly picked = signal<string | null>(null);
   protected readonly ready = computed(() => this.lists() !== undefined && this.savedId() !== undefined);
-  /** The list you picked, else your recipe list, else the household's shopping list, else any. */
+  /** The list you picked, else your main shopping list, else the household's, else any. */
   protected readonly target = computed(() => {
     const all = this.lists() ?? [];
     const id = this.picked() ?? this.savedId();
@@ -216,11 +216,12 @@ export class ImportPage {
     void this.router.navigateByUrl('/home', { replaceUrl: true });
   }
 
+  /** For this recipe only: the main list is set from its own menu, with a confirmation. */
   protected async pickList(): Promise<void> {
     const current = this.target()?.id;
     const sheet = await this.actionSheet.create({
-      header: 'לאיזו רשימה יתווספו מצרכים ממתכונים?',
-      subHeader: 'הבחירה תישמר להבא',
+      header: 'לאיזו רשימה להוסיף הפעם?',
+      subHeader: 'את רשימת הקניות הראשית קובעים בתפריט ⋮ של הרשימה',
       buttons: [
         ...(this.lists() ?? []).map((l) => ({
           // A trailing mark: an icon would push this name out of line with the others.
@@ -241,8 +242,8 @@ export class ImportPage {
     this.busy.set(true);
     try {
       const listId = this.target()?.id ?? (await this.createShoppingList());
-      // Wherever recipes went last time is where they go next time.
-      if (listId !== this.savedId()) {
+      // The first recipe's list becomes the main one; after that only the list menu changes it.
+      if (!this.savedId()) {
         void this.todoLists.setRecipeList(listId).catch(() => undefined);
       }
       const list = (await firstValueFrom(

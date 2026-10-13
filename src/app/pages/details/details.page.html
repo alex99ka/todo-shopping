@@ -10,6 +10,9 @@
         </span>
       }
       {{ todoList()?.name }}
+      @if (isMain()) {
+        <span class="main-tag">ראשית</span>
+      }
     </ion-title>
     <ion-buttons slot="end">
       <ion-button aria-label="אפשרויות הרשימה" (click)="openMenu()">
@@ -143,8 +146,13 @@
       @if (group.key !== 'done' || !shopping() || basketOpen()) {
       <ion-list inset>
         @for (item of group.items; track item.id) {
-          <ion-item-sliding>
-            <ion-item [class.done]="item.state">
+          <ion-item-sliding #sliding [disabled]="!!drag()">
+            <ion-item
+              [class.done]="item.state"
+              [attr.data-item-id]="item.id"
+              [class.lifted]="drag()?.item?.id === item.id"
+              [class.drop-target]="drag()?.over?.id === item.id"
+            >
               <ion-checkbox
                 slot="start"
                 [color]="shopping() ? 'tertiary' : 'primary'"
@@ -153,7 +161,11 @@
                 (ionChange)="toggleItem(item)"
               ></ion-checkbox>
               <!-- stopPropagation: ion-item would also pass this tap to the checkbox. -->
-              <ion-label class="ion-text-wrap" (click)="$event.stopPropagation(); rowTap(item)">
+              <ion-label
+                class="ion-text-wrap"
+                (pointerdown)="pressStart($event, item)"
+                (click)="$event.stopPropagation(); rowTap(item)"
+              >
                 <h2 dir="auto">
                   @if (!shopping() && item.priority === 'high' && !item.state) {
                     <ion-icon class="flag" name="flag" aria-label="עדיפות גבוהה"></ion-icon>
@@ -210,6 +222,9 @@
               }
             </ion-item>
             <ion-item-options side="end">
+              <ion-item-option color="primary" (click)="sliding.close(); copyToLists(item)">
+                <ion-icon slot="icon-only" name="copy-outline" aria-label="גם ברשימות אחרות"></ion-icon>
+              </ion-item-option>
               <ion-item-option color="danger" (click)="deleteItem(item)">
                 <ion-icon slot="icon-only" name="trash" aria-label="מחיקה"></ion-icon>
               </ion-item-option>
@@ -229,6 +244,9 @@
         <app-empty-list icon="list-circle" h1Text="אין משימות" h3Text="כתבו משימה בשורה למעלה ולחצו Enter." />
       }
     }
+    @if (shopping() && remaining() > 1) {
+      <p class="hint">אותו מצרך בשני שמות? לחיצה ארוכה עליו וגרירה אל השני מאחדת אותם.</p>
+    }
   }
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
     <ion-fab-button
@@ -240,3 +258,75 @@
     </ion-fab-button>
   </ion-fab>
 </ion-content>
+
+@if (drag(); as d) {
+  <div class="drag-ghost" [class.over]="d.over" [style.left.px]="d.x" [style.top.px]="d.y" aria-hidden="true">
+    <span dir="auto">{{ d.item.name }}</span>
+    @if (d.over) {
+      <small dir="auto">← לאחד עם {{ d.over.name }}</small>
+    }
+  </div>
+}
+
+<!-- Merging two lines whose name or amount is not obvious: pick or type them. -->
+<ion-modal
+  class="merge-sheet"
+  [isOpen]="!!merging()"
+  [initialBreakpoint]="1"
+  [breakpoints]="[0, 1]"
+  (didDismiss)="merging.set(null)"
+>
+  <ng-template>
+    @if (merging(); as m) {
+      <form class="merge" (submit)="$event.preventDefault(); confirmMerge()">
+        <h2>איחוד לשורה אחת</h2>
+        @if (m.names.length) {
+          <p class="label" id="merge-name">איך לקרוא לו?</p>
+          <div class="choices" role="radiogroup" aria-labelledby="merge-name">
+            @for (n of m.names; track n) {
+              <button
+                type="button"
+                class="choice"
+                role="radio"
+                [attr.aria-checked]="mergeName() === n"
+                [class.on]="mergeName() === n"
+                (click)="mergeName.set(n)"
+              >
+                {{ n }}
+              </button>
+            }
+          </div>
+        } @else {
+          <p class="label">שם</p>
+        }
+        <input
+          class="field"
+          dir="auto"
+          maxlength="500"
+          name="name"
+          aria-label="שם"
+          [ngModel]="mergeName()"
+          (ngModelChange)="mergeName.set($event)"
+        />
+        <p class="label">כמות</p>
+        <input
+          class="field"
+          dir="auto"
+          maxlength="200"
+          name="amount"
+          aria-label="כמות"
+          placeholder="למשל 500 גרם"
+          [ngModel]="mergeAmount()"
+          (ngModelChange)="mergeAmount.set($event)"
+        />
+        @if (!m.added) {
+          <p class="note">"{{ m.keep.description || '—' }}" ו"{{ m.drop.description || '—' }}" לא מתחברות לבד. כתבו כמה צריך בסך הכול.</p>
+        }
+        <div class="actions">
+          <ion-button fill="clear" color="medium" (click)="merging.set(null)">ביטול</ion-button>
+          <ion-button type="submit" color="tertiary" [disabled]="!mergeName().trim()">איחוד</ion-button>
+        </div>
+      </form>
+    }
+  </ng-template>
+</ion-modal>

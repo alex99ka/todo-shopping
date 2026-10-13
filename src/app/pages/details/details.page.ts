@@ -7,12 +7,14 @@ import {
   inject,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   ActionSheetController,
+  AlertController,
   IonBackButton,
   IonButton,
   IonButtons,
@@ -29,6 +31,7 @@ import {
   IonLabel,
   IonList,
   IonListHeader,
+  IonModal,
   IonProgressBar,
   IonTextarea,
   IonThumbnail,
@@ -45,6 +48,7 @@ import {
   calendar,
   checkboxOutline,
   chevronDown,
+  copyOutline,
   createOutline,
   ellipsisHorizontal,
   ellipsisVertical,
@@ -70,6 +74,7 @@ import {
   Item,
   MemberCard,
   TodoList,
+  addAmounts,
   completion,
   duplicateGroups,
   guessAisle,
@@ -106,6 +111,7 @@ import { ItemDetailsModalComponent } from '../item-details/item-details.modal';
     IonLabel,
     IonList,
     IonListHeader,
+    IonModal,
     IonProgressBar,
     IonTextarea,
     IonThumbnail,
@@ -121,6 +127,7 @@ export class DetailsPage {
   private readonly modalCtrl = inject(ModalController);
   private readonly toastCtrl = inject(ToastController);
   private readonly actionSheet = inject(ActionSheetController);
+  private readonly alertCtrl = inject(AlertController);
   private readonly households = inject(HouseholdService);
   private readonly invites = inject(InviteService);
   private readonly router = inject(Router);
@@ -187,6 +194,8 @@ export class DetailsPage {
   });
 
   private readonly recipeListId = toSignal(this.todoListService.recipeListId$(), { initialValue: null });
+  /** The main shopping list: the one the recipe book adds to. */
+  protected readonly isMain = computed(() => this.recipeListId() === this.listId);
   private readonly declinedJoins = signal<string[]>(readDeclined());
 
   /**
@@ -257,6 +266,7 @@ export class DetailsPage {
   constructor() {
     addIcons({
       chevronDown,
+      copyOutline,
       createOutline,
       repeat,
       add,
@@ -318,6 +328,10 @@ export class DetailsPage {
 
   /** Store mode: in a shopping list the whole row ticks; editing is the pencil. */
   protected rowTap(item: Item): void {
+    // The click that ends a drag is not a tap.
+    if (Date.now() - this.dragEndedAt < 500) {
+      return;
+    }
     if (this.shopping()) {
       this.toggleItem(item);
     } else {
@@ -430,6 +444,169 @@ export class DetailsPage {
     }
   }
 
+  // Drag to merge: long-press a shopping item, drag it onto another, let go.
+  protected readonly drag = signal<{ item: Item; x: number; y: number; over: Item | null } | null>(null);
+  /** The merge sheet: shown when the name or the amount of the merged line is not obvious. */
+  protected readonly merging = signal<{ keep: Item; drop: Item; names: string[]; added: boolean } | null>(null);
+  protected readonly mergeName = signal('');
+  protected readonly mergeAmount = signal('');
+  private readonly content = viewChild(IonContent);
+  private stopPress?: () => void;
+  private dragEndedAt = 0;
+
+  protected pressStart(event: PointerEvent, item: Item): void {
+    if (!this.shopping() || item.state || event.button !== 0) {
+      return;
+    }
+    this.stopPress?.();
+    const start = { x: event.clientX, y: event.clientY };
+    let scroller: HTMLElement | undefined;
+    let frame = 0;
+    const timer = setTimeout(async () => {
+      navigator.vibrate?.(20);
+      this.drag.set({ item, ...start, over: null });
+      scroller = await this.content()?.getScrollElement();
+      frame = requestAnimationFrame(edgeScroll);
+    }, 350);
+    // Held near the top or bottom edge, the list scrolls so a line further away can be reached.
+    const edgeScroll = () => {
+      const d = this.drag();
+      if (!d || !scroller) return;
+      const { top, bottom } = scroller.getBoundingClientRect();
+      const step = d.y < top + 60 ? -8 : d.y > bottom - 60 ? 8 : 0;
+      if (step) {
+        scroller.scrollTop += step;
+        this.dragTo(d.x, d.y);
+      }
+      frame = requestAnimationFrame(edgeScroll);
+    };
+    const move = (e: PointerEvent) => {
+      if (this.drag()) {
+        this.dragTo(e.clientX, e.clientY);
+      } else if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8) {
+        stop(); // Moving before the press is long is a scroll or a swipe.
+      }
+    };
+    const up = () => {
+      const over = this.drag()?.over;
+      stop();
+      if (over) this.dropOn(item, over);
+    };
+    // While dragging, a touch must not scroll the list or open the long-press menu.
+    const block = (e: Event) => this.drag() && e.preventDefault();
+    const stop = () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(frame);
+      if (this.drag()) this.dragEndedAt = Date.now();
+      this.drag.set(null);
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', stop);
+      removeEventListener('touchmove', block);
+      removeEventListener('contextmenu', block);
+      this.stopPress = undefined;
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', stop);
+    addEventListener('touchmove', block, { passive: false });
+    addEventListener('contextmenu', block);
+    this.stopPress = stop;
+  }
+
+  private dragTo(x: number, y: number): void {
+    const d = this.drag();
+    if (!d) return;
+    const id = document.elementFromPoint(x, y)?.closest('[data-item-id]')?.getAttribute('data-item-id');
+    const over = this.items().find((i) => i.id === id && i.id !== d.item.id && !i.state) ?? null;
+    this.drag.set({ ...d, x, y, over });
+  }
+
+  /** Same name and amounts that add up: merge at once (with undo). Anything less clear: ask. */
+  private dropOn(drop: Item, keep: Item): void {
+    const added = addAmounts([keep.description, drop.description]);
+    if (historyKey(keep.name) === historyKey(drop.name) && added !== null) {
+      void this.mergeLines(keep, drop, keep.name, added);
+      return;
+    }
+    const names = historyKey(keep.name) === historyKey(drop.name) ? [] : [keep.name, drop.name];
+    this.mergeName.set(keep.name);
+    this.mergeAmount.set(joinAmounts([keep.description, drop.description]));
+    this.merging.set({ keep, drop, names, added: added !== null });
+  }
+
+  protected confirmMerge(): void {
+    const m = this.merging();
+    const name = this.mergeName().trim();
+    if (!m || !name) return;
+    this.merging.set(null);
+    void this.mergeLines(m.keep, m.drop, name, this.mergeAmount().trim());
+  }
+
+  /** One line instead of two; undo puts both back as they were. */
+  private async mergeLines(keep: Item, drop: Item, name: string, description: string): Promise<void> {
+    void this.todoListService
+      .joinItems(this.listId, [{ keep, name, description, drop: [drop] }])
+      .catch(() => this.alert.presentToast('האיחוד נכשל'));
+    const toast = await this.toastCtrl.create({
+      message: `"${drop.name}" אוחד עם "${name}"`,
+      duration: 5000,
+      buttons: [{ text: 'ביטול', role: 'undo' }],
+    });
+    await toast.present();
+    const { role } = await toast.onDidDismiss();
+    if (role === 'undo') {
+      const { name: oldName, state, description: oldDescription, date } = keep;
+      void Promise.all([
+        this.todoListService.updateItem(this.listId, keep.id, { name: oldName, state, description: oldDescription, date }),
+        this.todoListService.restoreItems(this.listId, [drop]),
+      ]).catch(() => this.alert.presentToast('השחזור נכשל'));
+    }
+  }
+
+  /** Puts a copy of the item (name, amount, aisle) on other lists too; each copy is its own line. */
+  protected async copyToLists(item: Item): Promise<void> {
+    const [all, households] = await Promise.all([
+      firstValueFrom(this.todoListService.lists$()),
+      firstValueFrom(this.households.households$()),
+    ]);
+    const others = all
+      .filter((l) => l.id !== this.listId && l.createdAt)
+      .sort((a, b) => Number(isShopping(b)) - Number(isShopping(a)) || a.name.localeCompare(b.name, 'he'));
+    if (!others.length) {
+      await this.alert.presentToast('אין לך עוד רשימות');
+      return;
+    }
+    const prompt = await this.alertCtrl.create({
+      header: `להוסיף את "${item.name}" גם ל…`,
+      inputs: others.map((l) => ({ type: 'checkbox' as const, label: listLabel(l, households), value: l })),
+      buttons: [
+        { text: 'ביטול', role: 'cancel' },
+        { text: 'הוספה', role: 'confirm' },
+      ],
+    });
+    await prompt.present();
+    const { data, role } = await prompt.onDidDismiss<{ values?: TodoList[] }>();
+    const targets = role === 'confirm' ? (data?.values ?? []) : [];
+    for (const list of targets) {
+      // Not awaited, as everywhere: offline the local cache already has them.
+      void this.todoListService
+        .createItem(list.id, this.todoListService.newItemId(list.id), {
+          name: item.name,
+          description: item.description,
+          state: false,
+          date: Date.now(),
+          listCreatedAt: list.createdAt,
+          ...(item.category && { category: item.category }),
+        })
+        .catch(() => this.alert.presentToast('ההוספה נכשלה'));
+      void this.todoListService.recordHistory(list.id, list.createdAt, item.name, item.category).catch(() => undefined);
+    }
+    if (targets.length) {
+      await this.toast(targets.length === 1 ? `נוסף גם ל"${targets[0].name}"` : `נוסף לעוד ${targets.length} רשימות`, 2000);
+    }
+  }
+
   /** The ⋯ on a section heading: tick off, put back or empty the whole section. */
   protected async groupMenu(group: { key: string; title: string; items: Item[] }): Promise<void> {
     const n = group.items.length;
@@ -536,9 +713,7 @@ export class DetailsPage {
       header: list.name,
       buttons: [
         { text: 'הזמנת אנשים לרשימה', data: 'invite' },
-        ...(this.shopping() && this.recipeListId() !== list.id
-          ? [{ text: 'מצרכים ממתכונים יתווספו לכאן', data: 'recipes' }]
-          : []),
+        ...(this.shopping() && !this.isMain() ? [{ text: 'הגדרה כרשימת הקניות הראשית', data: 'main' }] : []),
         ...(owner
           ? [
               { text: 'שינוי שם', data: 'rename' },
@@ -566,9 +741,8 @@ export class DetailsPage {
         this.deleteList(list);
       } else if (data === 'move') {
         await this.moveToHousehold(list);
-      } else if (data === 'recipes') {
-        void this.todoListService.setRecipeList(list.id).catch(() => this.alert.presentToast('משהו השתבש'));
-        await this.alert.presentToast('מעכשיו מצרכים ממתכונים יתווספו לרשימה הזו');
+      } else if (data === 'main') {
+        await this.makeMain(list);
       } else if (data === 'merge') {
         await this.mergeInto(list);
       } else if (data === 'clear') {
@@ -626,6 +800,28 @@ export class DetailsPage {
       await this.todoListService.setHousehold(list.id, data ?? null);
       await this.alert.presentToast('הרשימה הועברה');
     }
+  }
+
+  /** Asks first, naming the list that stops being the main one. */
+  private async makeMain(list: TodoList): Promise<void> {
+    const [all, households] = await Promise.all([
+      firstValueFrom(this.todoListService.lists$()),
+      firstValueFrom(this.households.households$()),
+    ]);
+    const current = all.find((l) => l.id === this.recipeListId());
+    // Two lists called "קניות" are told apart by where they live.
+    const currentName = current && (current.name === list.name ? listLabel(current, households) : current.name);
+    void this.alert.createAlert({
+      title: 'להפוך לרשימת הקניות הראשית?',
+      message:
+        `מצרכים מספר המתכונים יתווספו ל"${list.name}".` +
+        (currentName ? ` "${currentName}" כבר לא תהיה הרשימה הראשית.` : ''),
+      yesText: 'כן, ראשית',
+      yesToastThen: `"${list.name}" היא עכשיו רשימת הקניות הראשית`,
+      yesToastCatch: 'משהו השתבש',
+      // Not awaited: offline it resolves only once synced.
+      yesFunction: async () => void this.todoListService.setRecipeList(list.id).catch(() => undefined),
+    });
   }
 
   /** Pick another list of yours of the same kind; its items and people move here and it goes. */
@@ -721,10 +917,12 @@ export class DetailsPage {
       },
     });
     await modal.present();
-    // The editor's delete button hands back here, so it gets the same undo.
+    // The editor's delete and copy buttons hand back here, so they act as from the list.
     const { role } = await modal.onDidDismiss();
     if (role === 'delete' && item) {
       this.deleteItem(item);
+    } else if (role === 'copy' && item) {
+      void this.copyToLists(item);
     }
   }
 }

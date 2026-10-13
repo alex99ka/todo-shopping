@@ -380,3 +380,141 @@ ion-list:last-of-type {
     margin-inline: auto;
   }
 }
+
+// The main shopping list (the recipe book adds to it), next to its name.
+.main-tag {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent-ink);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+// Drag to merge: a long press lifts a line (no text selection or callout on the way),
+// the line under the finger lights up, and a label follows the finger.
+.shopping ion-label {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+ion-item.lifted {
+  opacity: 0.35;
+}
+
+ion-item.drop-target {
+  --background: var(--app-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--ion-color-tertiary);
+}
+
+.drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 80vw;
+  padding: 8px 16px;
+  border: 1px solid var(--ion-border-color);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  // Above the finger, so the finger does not hide it.
+  transform: translate(-50%, calc(-100% - 24px));
+
+  &.over {
+    border-color: var(--ion-color-tertiary);
+  }
+
+  small {
+    color: var(--app-accent-ink);
+    font-weight: 500;
+  }
+}
+
+.hint {
+  margin: 8px 0 0;
+  padding: 0 24px 96px;
+  text-align: center;
+  color: var(--ion-color-medium-shade);
+  font-size: 0.85rem;
+}
+
+.merge {
+  padding: 20px 20px calc(12px + var(--ion-safe-area-bottom, 0px));
+
+  h2 {
+    margin: 0 0 12px;
+    font-size: 1.15rem;
+  }
+
+  .label {
+    margin: 12px 0 6px;
+    color: var(--ion-color-medium-shade);
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+
+  .choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .choice {
+    min-height: 40px;
+    padding: 0 16px;
+    border: 1px solid var(--ion-border-color);
+    border-radius: 20px;
+    background: #ffffff;
+    color: var(--ion-text-color);
+    font: inherit;
+    cursor: pointer;
+
+    &.on {
+      border-color: var(--ion-color-tertiary);
+      background: var(--app-accent-soft);
+      color: var(--app-accent-ink);
+      font-weight: 600;
+    }
+  }
+
+  .field {
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--ion-border-color);
+    border-radius: 12px;
+    background: var(--ion-background-color);
+    color: var(--ion-text-color);
+    font: inherit;
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--ion-color-primary);
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(var(--ion-color-primary-rgb), 0.15);
+    }
+  }
+
+  .note {
+    margin: 8px 0 0;
+    color: var(--app-accent-ink);
+    font-size: 0.85rem;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+  }
+}

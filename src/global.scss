@@ -98,3 +98,14 @@ ion-item-option {
 .action-sheet-destructive {
   color: var(--ion-color-danger) !important;
 }
+
+// Sheet modals that are as tall as what they hold (the merge sheet), not the full screen.
+ion-modal.merge-sheet {
+  --height: auto;
+
+  .ion-page {
+    position: relative;
+    display: block;
+    contain: content;
+  }
+}

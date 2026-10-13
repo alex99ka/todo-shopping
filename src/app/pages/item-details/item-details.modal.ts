@@ -28,7 +28,7 @@ import {
 } from '@ionic/angular';
 import type { Timestamp } from 'firebase/firestore';
 import { addIcons } from 'ionicons';
-import { camera, close, image as imageIcon, mic, trash } from 'ionicons/icons';
+import { camera, close, copyOutline, image as imageIcon, mic, trash } from 'ionicons/icons';
 import { AuthService, PhotoService, TodoListService } from '../../core';
 import {
   CATEGORIES,
@@ -111,7 +111,7 @@ export class ItemDetailsModalComponent implements OnInit {
   private readonly speech = inject(SpeechService);
 
   constructor() {
-    addIcons({ camera, close, image: imageIcon, mic, trash });
+    addIcons({ camera, close, copyOutline, image: imageIcon, mic, trash });
     inject(DestroyRef).onDestroy(() => {
       const url = this.existingPhoto();
       if (url) {
@@ -152,6 +152,11 @@ export class ItemDetailsModalComponent implements OnInit {
   // The list deletes it, so the editor's delete gets the list's undo toast.
   protected async remove(): Promise<void> {
     await this.modalCtrl.dismiss(null, 'delete');
+  }
+
+  /** The list asks which other lists get a copy. */
+  protected async copy(): Promise<void> {
+    await this.modalCtrl.dismiss(null, 'copy');
   }
 
   protected async takePicture(): Promise<void> {

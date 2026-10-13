@@ -9,6 +9,24 @@ versions reach installed apps as an in-app update.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-14
+
+### Added
+
+- Main shopping list: mark a shopping list as the main one from its ⋯ menu. The app asks
+  first and says which list stops being the main one. The recipe book adds to the main
+  list, which wears a "ראשית" tag on the home screen and next to its name.
+- An item can go on other lists too: "גם ברשימות אחרות…" in its swipe options or its
+  editor puts a copy (name, amount, aisle) on the lists you tick.
+- Drag to merge: long-press a shopping item and drag it onto another to make one line.
+  Same name and amounts that add up merge at once; otherwise a sheet asks which name
+  and what amount. Undo is offered either way.
+
+### Changed
+
+- Picking another list on the recipe import screen applies to that recipe only; the
+  main list changes only from the list's own menu.
+
 ## [1.4.0] - 2026-10-13
 
 ### Added
@@ -147,7 +165,8 @@ First release of Todo and Shopping, forked from
 - The non-working username/password and Facebook sign-in buttons (Google only).
 - The upstream site's Google Analytics snippet and the third-party avatar service.
 
-[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.4.0...HEAD
+[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.5.0...HEAD
+[1.5.0]: https://github.com/alex99ka/todo-shopping/compare/1.4.0...1.5.0
 [1.4.0]: https://github.com/alex99ka/todo-shopping/compare/1.3.0...1.4.0
 [1.3.0]: https://github.com/alex99ka/todo-shopping/compare/1.2.0...1.3.0
 [1.2.0]: https://github.com/alex99ka/todo-shopping/compare/1.1.2...1.2.0

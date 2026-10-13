@@ -109,7 +109,7 @@ export class HomePage {
     ),
     { initialValue: {} as Record<string, Summary | null> },
   );
-  /** Marked on its row: where the recipe book's ingredients go. */
+  /** The main shopping list, marked on its row: where the recipe book's ingredients go. */
   protected readonly recipeListId = toSignal(this.todoListService.recipeListId$());
   protected readonly households = toSignal(this.householdService.households$(), {
     initialValue: [],

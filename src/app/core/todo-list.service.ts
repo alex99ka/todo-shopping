@@ -253,11 +253,14 @@ export class TodoListService {
     return batch.commit();
   }
 
-  /** Each group becomes its oldest item carrying the joined amount; the others are deleted. */
-  joinItems(listId: string, groups: { keep: Item; description: string; drop: Item[] }[]): Promise<void> {
+  /** Each group becomes its kept item, carrying the joined amount (and a new name if given); the others are deleted. */
+  joinItems(listId: string, groups: { keep: Item; name?: string; description: string; drop: Item[] }[]): Promise<void> {
     const batch = writeBatch(this.db);
-    for (const { keep, description, drop } of groups) {
-      batch.update(this.itemRef(listId, keep.id), { description: description.slice(0, 5000) });
+    for (const { keep, name, description, drop } of groups) {
+      batch.update(this.itemRef(listId, keep.id), {
+        description: description.slice(0, 5000),
+        ...(name && { name: name.slice(0, 500) }),
+      });
       drop.forEach((i) => batch.delete(this.itemRef(listId, i.id)));
     }
     return batch.commit();
