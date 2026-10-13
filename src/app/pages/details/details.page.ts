@@ -49,6 +49,7 @@ import {
   ellipsisHorizontal,
   ellipsisVertical,
   flag,
+  gitMerge,
   repeat,
   send,
   trash,
@@ -70,9 +71,12 @@ import {
   MemberCard,
   TodoList,
   completion,
+  duplicateGroups,
   guessAisle,
   historyKey,
   isShopping,
+  joinAmounts,
+  listLabel,
   parseEntry,
   splitEntries,
 } from '../../models';
@@ -182,6 +186,29 @@ export class DetailsPage {
     return !!list && isShopping(list);
   });
 
+  private readonly recipeListId = toSignal(this.todoListService.recipeListId$(), { initialValue: null });
+  private readonly declinedJoins = signal<string[]>(readDeclined());
+
+  /**
+   * Shopping lines for the same thing (a recipe on top of what was there, two lists
+   * merged): each group with what joining would make of the amounts, until declined.
+   */
+  protected readonly joins = computed(() => {
+    if (!this.shopping()) return [];
+    const declined = new Set(this.declinedJoins());
+    return duplicateGroups(this.items())
+      .map((items) => {
+        const parts = items.map((i) => i.description.trim()).filter(Boolean);
+        return {
+          items,
+          key: items.map((i) => i.id).sort().join(','),
+          from: parts.length > 1 ? parts.join(' + ') : '',
+          to: joinAmounts(parts),
+        };
+      })
+      .filter((g) => !declined.has(g.key));
+  });
+
   protected readonly remaining = computed(() => this.items().filter((i) => !i.state).length);
   protected readonly progress = computed(() => {
     const total = this.items().length;
@@ -240,6 +267,7 @@ export class DetailsPage {
       ellipsisHorizontal,
       ellipsisVertical,
       flag,
+      gitMerge,
       send,
       trash,
     });
@@ -384,6 +412,24 @@ export class DetailsPage {
     return category;
   }
 
+  /** Yes on the duplicates card: each group becomes its oldest line, with the amounts added up. */
+  protected joinDuplicates(): void {
+    const groups = this.joins().map(({ items: [keep, ...drop], to }) => ({ keep, drop, description: to }));
+    void this.todoListService.joinItems(this.listId, groups).catch(() => this.alert.presentToast('האיחוד נכשל'));
+    void this.toast(groups.length === 1 ? `"${groups[0].keep.name}" אוחד` : `${groups.length} פריטים אוחדו`, 1500);
+  }
+
+  /** No: these lines stay apart, and the card does not ask about them again. */
+  protected declineJoins(): void {
+    const keys = [...this.declinedJoins(), ...this.joins().map((g) => g.key)].slice(-50);
+    this.declinedJoins.set(keys);
+    try {
+      localStorage.setItem(DECLINED_KEY, JSON.stringify(keys));
+    } catch {
+      return; // No storage (private mode): it asks again next visit.
+    }
+  }
+
   /** The ⋯ on a section heading: tick off, put back or empty the whole section. */
   protected async groupMenu(group: { key: string; title: string; items: Item[] }): Promise<void> {
     const n = group.items.length;
@@ -490,10 +536,14 @@ export class DetailsPage {
       header: list.name,
       buttons: [
         { text: 'הזמנת אנשים לרשימה', data: 'invite' },
+        ...(this.shopping() && this.recipeListId() !== list.id
+          ? [{ text: 'מצרכים ממתכונים יתווספו לכאן', data: 'recipes' }]
+          : []),
         ...(owner
           ? [
               { text: 'שינוי שם', data: 'rename' },
               { text: 'העברה למשק בית…', data: 'move' },
+              { text: 'מיזוג רשימה אחרת לכאן…', data: 'merge' },
             ]
           : []),
         ...(done.length ? [{ text: `ניקוי ${done.length} שסומנו`, data: 'clear' }] : []),
@@ -516,6 +566,11 @@ export class DetailsPage {
         this.deleteList(list);
       } else if (data === 'move') {
         await this.moveToHousehold(list);
+      } else if (data === 'recipes') {
+        void this.todoListService.setRecipeList(list.id).catch(() => this.alert.presentToast('משהו השתבש'));
+        await this.alert.presentToast('מעכשיו מצרכים ממתכונים יתווספו לרשימה הזו');
+      } else if (data === 'merge') {
+        await this.mergeInto(list);
       } else if (data === 'clear') {
         void this.removeItems(done, `${done.length} נוקו`);
       } else if (data === 'empty') {
@@ -571,6 +626,47 @@ export class DetailsPage {
       await this.todoListService.setHousehold(list.id, data ?? null);
       await this.alert.presentToast('הרשימה הועברה');
     }
+  }
+
+  /** Pick another list of yours of the same kind; its items and people move here and it goes. */
+  private async mergeInto(list: TodoList): Promise<void> {
+    const [all, households] = await Promise.all([
+      firstValueFrom(this.todoListService.lists$()),
+      firstValueFrom(this.households.households$()),
+    ]);
+    const others = all.filter(
+      (l) => l.id !== list.id && l.ownerUid === this.uid && l.createdAt && isShopping(l) === isShopping(list),
+    );
+    if (!others.length) {
+      await this.alert.presentToast(`אין לך עוד ${this.shopping() ? 'רשימת קניות' : 'רשימת משימות'} למיזוג`);
+      return;
+    }
+    const sheet = await this.actionSheet.create({
+      header: `איזו רשימה למזג לתוך "${list.name}"?`,
+      buttons: [
+        ...others.map((l) => ({ text: listLabel(l, households), data: l })),
+        { text: 'ביטול', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+    const { data: source, role } = await sheet.onDidDismiss<TodoList>();
+    if (!source || role === 'cancel' || role === 'backdrop') {
+      return;
+    }
+    void this.alert.createAlert({
+      title: `למזג את "${source.name}"?`,
+      message: `הפריטים שלה ומי שרואה אותה יעברו ל"${list.name}", והיא תימחק.`,
+      yesText: 'מיזוג',
+      yesToastThen: 'הרשימות מוזגו',
+      yesToastCatch: 'המיזוג נכשל',
+      yesFunction: async () => {
+        await this.todoListService.mergeList(list, source);
+        // Recipes that went to the merged list now come here.
+        if (this.recipeListId() === source.id) {
+          void this.todoListService.setRecipeList(list.id).catch(() => undefined);
+        }
+      },
+    });
   }
 
   private photoPaths(items: Item[]): Set<string> {
@@ -634,6 +730,7 @@ export class DetailsPage {
 }
 
 const DAY = 24 * 60 * 60 * 1000;
+const DECLINED_KEY = 'declined-joins';
 const PRIORITY_RANK = { high: 0, normal: 1, low: 2 };
 
 function rank(item: Item): number {
@@ -644,6 +741,14 @@ function startOfDay(ms: number): number {
   const d = new Date(ms);
   d.setHours(0, 0, 0, 0);
   return d.getTime();
+}
+
+function readDeclined(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(DECLINED_KEY) ?? '[]');
+  } catch {
+    return [];
+  }
 }
 
 function byName(items: Item[]): Item[] {

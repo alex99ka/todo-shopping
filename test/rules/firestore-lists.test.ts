@@ -6,6 +6,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   deleteField,
@@ -18,6 +19,8 @@ import {
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
+  type Firestore,
 } from 'firebase/firestore';
 import { withTestEnv } from '../helpers/emulator.ts';
 
@@ -341,5 +344,93 @@ test('the owner cannot change a list kind', async () => {
     const db = env.authenticatedContext(OWNER).firestore();
     await setDoc(doc(db, 'lists/s'), { ...newList(OWNER, [OWNER]), kind: 'shopping' });
     await assertFails(updateDoc(doc(db, 'lists/s'), { kind: 'todo' }));
+  });
+});
+
+// list-2 is the owner's other list, shared with FRIEND and filed under the household
+// 'home', where HOUSEMATE lives.
+const FRIEND = 'friend-uid';
+const HOUSEMATE = 'housemate-uid';
+
+async function seedMerge(env: RulesTestEnvironment, list2Owner = OWNER): Promise<void> {
+  await seed(env);
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'households/home'), {
+      ownerUid: OWNER,
+      name: 'Home',
+      date: 1000,
+      createdAt: T0,
+      memberUids: [OWNER, HOUSEMATE],
+      joinedAt: { [OWNER]: T0, [HOUSEMATE]: T0 },
+    });
+    await setDoc(doc(db, 'lists/list-2'), {
+      ownerUid: list2Owner,
+      name: 'More groceries',
+      date: 1000,
+      createdAt: T0,
+      memberUids: [list2Owner, FRIEND],
+      joinedAt: { [list2Owner]: T0, [FRIEND]: T0 },
+      householdId: 'home',
+      householdCreatedAt: T0,
+    });
+  });
+}
+
+// TodoListService.mergeList's list writes: list-2 into list-1.
+function merge(db: Firestore, added: string[], deleteSource = true, adopt: unknown[] = []) {
+  const batch = writeBatch(db);
+  batch.update(
+    doc(db, 'lists/list-1'),
+    'mergedFrom',
+    'list-2',
+    'memberUids',
+    arrayUnion(...added),
+    ...adopt,
+    ...added.flatMap((uid) => [`joinedAt.${uid}`, serverTimestamp()]),
+  );
+  if (deleteSource) batch.delete(doc(db, 'lists/list-2'));
+  return batch.commit();
+}
+
+test('merging another list in brings its members and household along', async () => {
+  await withTestEnv(async (env) => {
+    await seedMerge(env);
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(merge(db, [FRIEND, HOUSEMATE]));
+    await assertSucceeds(getDoc(doc(env.authenticatedContext(HOUSEMATE).firestore(), 'lists/list-1')));
+  });
+});
+
+test('a personal list merging a household list joins that household', async () => {
+  await withTestEnv(async (env) => {
+    await seedMerge(env);
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(merge(db, [FRIEND], true, ['householdId', 'home', 'householdCreatedAt', T0]));
+  });
+});
+
+test('a merge must delete the merged list in the same batch', async () => {
+  await withTestEnv(async (env) => {
+    await seedMerge(env);
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertFails(merge(db, [FRIEND], false));
+  });
+});
+
+test('a merge adds only people who could see the merged list', async () => {
+  await withTestEnv(async (env) => {
+    await seedMerge(env);
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertFails(merge(db, [FRIEND, STRANGER]));
+  });
+});
+
+test('only the owner of both lists merges them', async () => {
+  await withTestEnv(async (env) => {
+    // MEMBER owns list-2 and is only a member of list-1.
+    await seedMerge(env, MEMBER);
+    await assertFails(merge(env.authenticatedContext(MEMBER).firestore(), [FRIEND]));
+    await assertFails(merge(env.authenticatedContext(OWNER).firestore(), [FRIEND]));
   });
 });

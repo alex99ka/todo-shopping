@@ -43,3 +43,16 @@
     font-weight: 600;
   }
 }
+
+// The recipe list: the one the recipe book adds ingredients to.
+.tag {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent-ink);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}

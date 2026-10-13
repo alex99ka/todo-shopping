@@ -57,7 +57,8 @@ export class AuthService {
 
   private async persistProfile(credential: UserCredential): Promise<User> {
     const profile = toProfile(credential.user);
-    await setDoc(doc(this.db, 'users', profile.uid), profile);
+    // merge: the profile doc also holds settings (recipeListId) that sign-in must keep.
+    await setDoc(doc(this.db, 'users', profile.uid), profile, { merge: true });
     return profile;
   }
 }

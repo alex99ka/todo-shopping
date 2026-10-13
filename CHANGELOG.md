@@ -9,6 +9,24 @@ versions reach installed apps as an in-app update.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-13
+
+### Added
+
+- Recipe list: choose which shopping list the recipe book adds to, on the import screen
+  or from a list's ⋯ menu. The choice is remembered on every device, and the list
+  carries a "מתכונים" tag on the home screen.
+- The recipe import is editable: change a name, its amount and unit (grams, kilos,
+  litres or units), or remove a line before adding.
+- Joining duplicates: when a shopping list has the same thing on several lines, a card
+  asks whether to join them, adding up the amounts (400 גרם + 700 גרם = 1.1 ק״ג).
+- Merge lists: pull another list of yours into this one from the ⋯ menu. Its items
+  move over, everyone who could see it can see this one, and it is deleted.
+
+### Changed
+
+- Imported items no longer carry the recipe name in their notes, only the amount.
+
 ## [1.3.0] - 2026-10-05
 
 ### Added
@@ -129,7 +147,8 @@ First release of Todo and Shopping, forked from
 - The non-working username/password and Facebook sign-in buttons (Google only).
 - The upstream site's Google Analytics snippet and the third-party avatar service.
 
-[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.3.0...HEAD
+[unreleased]: https://github.com/alex99ka/todo-shopping/compare/1.4.0...HEAD
+[1.4.0]: https://github.com/alex99ka/todo-shopping/compare/1.3.0...1.4.0
 [1.3.0]: https://github.com/alex99ka/todo-shopping/compare/1.2.0...1.3.0
 [1.2.0]: https://github.com/alex99ka/todo-shopping/compare/1.1.2...1.2.0
 [1.1.2]: https://github.com/alex99ka/todo-shopping/compare/1.1.1...1.1.2

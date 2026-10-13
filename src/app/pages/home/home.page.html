@@ -23,7 +23,12 @@
                 <ion-icon [name]="isShopping(todoList) ? 'basket' : 'checkbox-outline'"></ion-icon>
               </span>
               <ion-label>
-                <h2>{{ todoList.name }}</h2>
+                <h2>
+                  {{ todoList.name }}
+                  @if (todoList.id === recipeListId()) {
+                    <span class="tag">מתכונים</span>
+                  }
+                </h2>
                 @let s = summaryText(todoList);
                 <p class="status" [class.late]="s.late">{{ s.text }}</p>
               </ion-label>

@@ -161,12 +161,40 @@ service cloud.firestore {
       allow create: if signedIn() && validNewGroup(['householdId', 'householdCreatedAt', 'kind'])
         && request.resource.data.get('kind', 'todo') in ['todo', 'shopping']
         && validHousehold();
+      // Everyone who can see a list: its members and, while it is filed there, its household.
+      function viewers(list) {
+        let id = list.get('householdId', null);
+        let path = /databases/$(database)/documents/households/$(id);
+        return list.memberUids.concat(
+          id != null && exists(path) && get(path).data.createdAt == list.get('householdCreatedAt', null)
+            ? get(path).data.memberUids : []);
+      }
+
+      // The owner merges another list of theirs into this one: that list is deleted in
+      // the same batch, and only people who could see it join this one.
+      function isMerge() {
+        let d = request.resource.data;
+        let path = /databases/$(database)/documents/lists/$(d.mergedFrom);
+        let added = d.memberUids.toSet().difference(resource.data.memberUids.toSet());
+        return isOwner()
+          && changedKeys().hasOnly(['mergedFrom', 'memberUids', 'joinedAt', 'householdId', 'householdCreatedAt'])
+          && d.mergedFrom is string
+          && exists(path) && !existsAfter(path)
+          && get(path).data.ownerUid == request.auth.uid
+          && d.memberUids.toSet().hasAll(resource.data.memberUids)
+          && d.memberUids.size() == d.memberUids.toSet().size()
+          && added.difference(viewers(get(path).data).toSet()).size() == 0
+          && d.joinedAt.diff(resource.data.joinedAt).affectedKeys() == added
+          && validHousehold();
+      }
+
       allow delete: if isOwner();
       allow update: if (isOwner()
                         && changedKeys().hasOnly(['name', 'date', 'householdId', 'householdCreatedAt'])
                         && validMutableFields() && validHousehold())
                     || isSelfRemoval()
-                    || isInvitedJoin('list', listId);
+                    || isInvitedJoin('list', listId)
+                    || isMerge();
 
       function listDoc() {
         return get(/databases/$(database)/documents/lists/$(listId)).data;

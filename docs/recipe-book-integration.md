@@ -48,11 +48,9 @@ Then the server responds:
 
 1. Signs the user in if needed, then returns to the page.
 2. Parses the fragment and keeps at most 100 items. Every string is trimmed to 200 characters, and an unknown category becomes `Other`.
-3. Shows a preview grouped by aisle with an **Add N items** button. Nothing is written until the user taps it, because anyone can craft an `/import#…` link.
-4. Adds the items to the household's shopping list (a list with `kind: 'shopping'`, or a 1.0.0 list named `Shopping`), creating one named `קניות` if it is missing. The list groups items by category.
-   - If an unchecked item with the same name (ignoring case) is already on the list, the new quantity and the recipe title are appended to that item's description. No second line is added.
-   - New items get the description `<quantity> · <recipe>`.
-5. Opens the list.
+3. Shows an editable preview grouped by aisle: each line has a name, an amount and a unit (grams, kilograms, litres or units), and can be removed. A `quantity` in those units (`400 גרם`, `1/2 ק"ג`, `200 מ"ל`, a bare `2`) is filled in; anything else (`2 כפות`) is shown as "במתכון: …" and kept as written unless an amount is typed. Nothing is written until the user taps **Add N items**, because anyone can craft an `/import#…` link.
+4. Adds the items to the user's recipe list: the shopping list they picked on this page or in a list's ⋯ menu (stored as `users/{uid}.recipeListId`). Until they pick one, it is the household's shopping list, then any shopping list, and a new `קניות` if there is none. Each item's description is its amount.
+5. Opens the list. If a name is now on it more than once (unchecked), a card offers to join the lines into one with the amounts added up (`400 גרם` + `700 גרם` = `1.1 ק"ג`).
 
 No Firebase credentials, config or SDK ever go into the recipe project. The write happens in the user's browser, as that user, under the Firestore rules.
 

@@ -326,3 +326,57 @@ ion-list:last-of-type {
   min-height: 44px;
   margin: 0;
 }
+
+// "Join these?": a quiet amber card above the aisles, asked once per set of duplicates.
+.join {
+  margin: 12px 16px 0;
+  padding: 12px 14px 4px;
+  border-radius: 14px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent-ink);
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    color: var(--ion-text-color);
+    font-size: 0.9rem;
+  }
+
+  .how {
+    color: var(--ion-color-medium-shade);
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+
+    b {
+      color: var(--app-accent-ink);
+    }
+  }
+
+  .join-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  @media (min-width: 768px) {
+    max-width: 720px;
+    margin-inline: auto;
+  }
+}

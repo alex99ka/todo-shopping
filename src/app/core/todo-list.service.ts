@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import {
+  FieldPath,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -16,7 +18,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { collectionData, docData } from 'rxfire/firestore';
-import { Observable, catchError, combineLatest, map, of, retry, switchMap } from 'rxjs';
+import { Observable, catchError, combineLatest, firstValueFrom, map, of, retry, switchMap } from 'rxjs';
 import {
   HistoryEntry,
   Household,
@@ -139,6 +141,63 @@ export class TodoListService {
     return created.id;
   }
 
+  /** The shopping list recipes are added to; kept in your private profile, so every device agrees. */
+  recipeListId$(): Observable<string | null> {
+    const uid = this.auth.uid;
+    if (!uid) return of(null);
+    return docData(doc(this.db, 'users', uid)).pipe(
+      map((user) => (user?.['recipeListId'] as string | undefined) ?? null),
+      catchError(() => of(null)),
+    );
+  }
+
+  setRecipeList(listId: string): Promise<void> {
+    return setDoc(doc(this.db, 'users', this.auth.uid ?? ''), { recipeListId: listId }, { merge: true });
+  }
+
+  /**
+   * Moves another list of yours into this one, in one batch: its items are copied,
+   * whoever could see it (members and its household) joins this list, and it is
+   * deleted. The rules allow the new members only because of that delete.
+   */
+  async mergeList(target: TodoList, source: TodoList): Promise<void> {
+    const [items, households] = await Promise.all([
+      firstValueFrom(this.items$(source.id, source.createdAt)),
+      firstValueFrom(this.households.households$()),
+    ]);
+    const house = households.find(
+      (h) => h.id === source.householdId && !!source.householdCreatedAt?.isEqual(h.createdAt),
+    );
+    // A personal list joins the source's household; one in another household gets its people instead.
+    const adopt = house && !target.householdId;
+    const viewers = [...source.memberUids, ...(house && !adopt && house.id !== target.householdId ? house.memberUids : [])];
+    const added = [...new Set(viewers)].filter((uid) => !target.memberUids.includes(uid));
+    const batch = writeBatch(this.db);
+    batch.update(
+      doc(this.db, 'lists', target.id),
+      'mergedFrom',
+      source.id,
+      ...(added.length ? ['memberUids', arrayUnion(...added)] : []),
+      ...(adopt ? ['householdId', house.id, 'householdCreatedAt', house.createdAt] : []),
+      // A FieldPath keeps a uid with dots one key (see leave()).
+      ...added.flatMap((uid) => [new FieldPath('joinedAt', uid), serverTimestamp()]),
+    );
+    // Same ids in the new list: they are random, so they cannot clash.
+    for (const { id, ...item } of items) {
+      // doneBy may only name yourself (as in restoreItems).
+      const doneBy = item.doneBy === this.auth.uid ? item.doneBy : null;
+      batch.set(this.itemRef(target.id, id), {
+        ...item,
+        doneBy,
+        listCreatedAt: target.createdAt,
+        by: this.auth.uid,
+      });
+    }
+    batch.delete(doc(this.db, 'lists', source.id));
+    // shortcut: a batch caps at 500 writes, so a list of ~495 items fails; split the batch if lists get that long.
+    return batch.commit();
+  }
+
   setHousehold(listId: string, household: Household | null): Promise<void> {
     return updateDoc(doc(this.db, 'lists', listId), {
       householdId: household?.id ?? null,
@@ -190,6 +249,16 @@ export class TodoListService {
       // doneBy may only name yourself, so someone else's tick comes back unattributed.
       const doneBy = item.doneBy === this.auth.uid ? item.doneBy : null;
       batch.set(this.itemRef(listId, id), { ...item, doneBy, by: this.auth.uid });
+    }
+    return batch.commit();
+  }
+
+  /** Each group becomes its oldest item carrying the joined amount; the others are deleted. */
+  joinItems(listId: string, groups: { keep: Item; description: string; drop: Item[] }[]): Promise<void> {
+    const batch = writeBatch(this.db);
+    for (const { keep, description, drop } of groups) {
+      batch.update(this.itemRef(listId, keep.id), { description: description.slice(0, 5000) });
+      drop.forEach((i) => batch.delete(this.itemRef(listId, i.id)));
     }
     return batch.commit();
   }

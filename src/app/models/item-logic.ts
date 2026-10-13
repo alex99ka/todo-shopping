@@ -73,3 +73,67 @@ export function splitEntries(text: string): string[] {
 export function historyKey(name: string): string {
   return encodeURIComponent(name.trim().replace(/\s+/g, ' ').toLowerCase()).slice(0, 400);
 }
+
+/** The units a shopping amount is kept in. */
+export type Unit = 'g' | 'kg' | 'l' | 'unit';
+export const UNIT_LABELS: Record<Unit, string> = { g: 'גרם', kg: 'ק״ג', l: 'ליטר', unit: 'יח׳' };
+
+export interface Amount {
+  value: number;
+  unit: Unit;
+}
+
+// Spellings (quotes and dots stripped) -> unit and the factor into it; millilitres become litres.
+const UNIT_WORDS: Record<string, [Unit, number]> = {
+  גרם: ['g', 1], גר: ['g', 1], ג: ['g', 1], g: ['g', 1], gr: ['g', 1],
+  קג: ['kg', 1], קילו: ['kg', 1], kg: ['kg', 1],
+  ליטר: ['l', 1], ל: ['l', 1], l: ['l', 1],
+  מל: ['l', 0.001], ml: ['l', 0.001],
+  יח: ['unit', 1], יחידה: ['unit', 1], יחידות: ['unit', 1],
+};
+
+/** "400 גרם", "1.5 ק״ג", "1/2 ליטר", "2" -> amount; null for anything in other units ("2 כפות"). */
+export function parseAmount(text: string): Amount | null {
+  const m = text.trim().match(/^(\d+(?:[.,]\d+)?(?:\/\d+)?)\s*(.*)$/);
+  const unit = m && (m[2] ? UNIT_WORDS[m[2].replace(/["'״׳.]/g, '').toLowerCase()] : (['unit', 1] as const));
+  if (!m || !unit) return null;
+  // "1,000" is a thousand, "1,5" one and a half.
+  const [a, b] = m[1].replace(/,(\d{3})$/, '$1').replace(',', '.').split('/');
+  const value = (b ? Number(a) / Number(b) : Number(a)) * unit[1];
+  return Number.isFinite(value) ? { value, unit: unit[0] } : null;
+}
+
+export function formatAmount({ value, unit }: Amount): string {
+  return `${Math.round(value * 100) / 100} ${UNIT_LABELS[unit]}`;
+}
+
+/**
+ * The amount of several lines for the same thing: "400 גרם" + "0.7 ק״ג" -> "1.1 ק״ג".
+ * Amounts that do not add up (other units, free text) are kept side by side with "+".
+ */
+export function joinAmounts(texts: string[]): string {
+  const parts = texts.map((t) => t.trim()).filter(Boolean);
+  const amounts = parts.map(parseAmount).filter((a) => a !== null);
+  const mass = (a: Amount) => a.unit === 'g' || a.unit === 'kg';
+  const [first] = amounts;
+  const addable =
+    parts.length > 1 &&
+    amounts.length === parts.length &&
+    amounts.every((a) => (mass(a) ? mass(first) : a.unit === first.unit));
+  if (!addable) return parts.join(' + ');
+  if (mass(first)) {
+    const grams = amounts.reduce((sum, a) => sum + a.value * (a.unit === 'kg' ? 1000 : 1), 0);
+    return formatAmount(grams >= 1000 ? { value: grams / 1000, unit: 'kg' } : { value: grams, unit: 'g' });
+  }
+  return formatAmount({ value: amounts.reduce((sum, a) => sum + a.value, 0), unit: first.unit });
+}
+
+/** Open items that share a name (case and spacing aside), oldest first in each group. */
+export function duplicateGroups<T extends { name: string; state: boolean; date: number }>(items: T[]): T[][] {
+  const byName = new Map<string, T[]>();
+  for (const item of items.filter((i) => !i.state)) {
+    const key = historyKey(item.name);
+    byName.set(key, [...(byName.get(key) ?? []), item]);
+  }
+  return [...byName.values()].filter((g) => g.length > 1).map((g) => g.sort((a, b) => a.date - b.date));
+}

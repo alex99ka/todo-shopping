@@ -66,6 +66,8 @@ export interface TodoList {
   householdCreatedAt?: Timestamp | null;
   /** Which invite each member joined with; the rules check it on join. */
   invites?: Record<string, string>;
+  /** The last list merged into this one; the rules check its members on merge. */
+  mergedFrom?: string;
 }
 
 export interface Household {
@@ -109,6 +111,14 @@ export const SHOPPING_LIST = 'קניות';
 /** Lists from before `kind` existed were shopping lists only when named "Shopping". */
 export function isShopping(list: Pick<TodoList, 'kind' | 'name'>): boolean {
   return list.kind ? list.kind === 'shopping' : list.name === 'Shopping';
+}
+
+/** "קניות · משפחה" or "קניות · אישית": tells apart lists with the same name. */
+export function listLabel(list: TodoList, households: Household[]): string {
+  const where = list.householdId
+    ? (households.find((h) => h.id === list.householdId)?.name ?? 'משותפת')
+    : 'אישית';
+  return `${list.name} · ${where}`;
 }
 
 // Aisle order. The recipe server's ai.py returns exactly these strings, so they

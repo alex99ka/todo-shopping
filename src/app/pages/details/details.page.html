@@ -85,6 +85,31 @@
         <ion-progress-bar [color]="shopping() ? 'tertiary' : 'primary'" [value]="progress()" aria-hidden="true"></ion-progress-bar>
       </div>
     }
+    @if (joins().length) {
+      <section class="join" aria-labelledby="join-title">
+        <h3 id="join-title">
+          <ion-icon name="git-merge" aria-hidden="true"></ion-icon>
+          {{ joins().length === 1 ? 'פריט מופיע כמה פעמים' : joins().length + ' פריטים מופיעים כמה פעמים' }}. לאחד?
+        </h3>
+        <ul>
+          @for (g of joins(); track g.key) {
+            <li>
+              <span class="what" dir="auto">{{ g.items[0].name }}</span>
+              <span class="how" dir="auto">
+                @if (g.from && g.from !== g.to) {
+                  {{ g.from }} ←
+                }
+                <b>{{ g.to || '×' + g.items.length }}</b>
+              </span>
+            </li>
+          }
+        </ul>
+        <div class="join-actions">
+          <ion-button fill="clear" color="medium" (click)="declineJoins()">לא</ion-button>
+          <ion-button color="tertiary" (click)="joinDuplicates()">כן, לאחד</ion-button>
+        </div>
+      </section>
+    }
     @for (group of groups(); track group.key) {
       <ion-list-header class="aisle" [class.overdue]="group.key === 'overdue'">
         @if (group.key === 'done' && shopping()) {

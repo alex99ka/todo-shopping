@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { completion, historyKey, nextDue, parseEntry, splitEntries } from '../../src/app/models/item-logic.ts';
+import {
+  completion,
+  duplicateGroups,
+  historyKey,
+  joinAmounts,
+  nextDue,
+  parseAmount,
+  parseEntry,
+  splitEntries,
+} from '../../src/app/models/item-logic.ts';
 
 const at = (s: string) => new Date(s).getTime();
 
@@ -34,4 +43,38 @@ test('quick entries split and carry a quantity', () => {
   assert.deepEqual(parseEntry('לחם מלא'), { name: 'לחם מלא', quantity: '' });
   assert.equal(historyKey('  Oat  Milk '), historyKey('oat milk'));
   assert.ok(!historyKey('a/b').includes('/'));
+});
+
+test('amounts parse into grams, kilos, litres or units', () => {
+  assert.deepEqual(parseAmount('400 גרם'), { value: 400, unit: 'g' });
+  assert.deepEqual(parseAmount('1,5 ק"ג'), { value: 1.5, unit: 'kg' });
+  assert.deepEqual(parseAmount('1/2 ק״ג'), { value: 0.5, unit: 'kg' });
+  assert.deepEqual(parseAmount('200 מ״ל'), { value: 0.2, unit: 'l' });
+  assert.deepEqual(parseAmount('2'), { value: 2, unit: 'unit' });
+  assert.deepEqual(parseAmount("3 יח'"), { value: 3, unit: 'unit' });
+  assert.deepEqual(parseAmount('1,000 גרם'), { value: 1000, unit: 'g' });
+  assert.equal(parseAmount('2 כפות'), null);
+  assert.equal(parseAmount('קצת'), null);
+});
+
+test('joining lines adds up what can be added', () => {
+  assert.equal(joinAmounts(['400 גרם', '700 גרם']), '1.1 ק״ג');
+  assert.equal(joinAmounts(['400 גרם', '0.5 ק״ג']), '900 גרם');
+  assert.equal(joinAmounts(['1 ליטר', '500 מ"ל']), '1.5 ליטר');
+  assert.equal(joinAmounts(['2', "3 יח'"]), '5 יח׳');
+  assert.equal(joinAmounts(['', '700 גרם']), '700 גרם');
+  assert.equal(joinAmounts(['', '']), '');
+  assert.equal(joinAmounts(['400 גרם', '2 יח׳']), '400 גרם + 2 יח׳');
+  assert.equal(joinAmounts(['2 כפות', '1 כף']), '2 כפות + 1 כף');
+});
+
+test('duplicates are open items with the same name, oldest first', () => {
+  const item = (name: string, date: number, state = false) => ({ name, date, state });
+  const groups = duplicateGroups([
+    item('בשר טחון', 2),
+    item('חלב', 1),
+    item(' בשר  טחון', 1),
+    item('חלב', 3, true),
+  ]);
+  assert.deepEqual(groups, [[item(' בשר  טחון', 1), item('בשר טחון', 2)]]);
 });
