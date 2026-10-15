@@ -111,9 +111,14 @@ import { AlertService } from '../../shared';
             </ion-item>
           }
           @case ('needs-apk') {
-            <ion-item button [href]="updates.apkUrl()" target="_blank" rel="noopener">
-              <ion-icon slot="start" name="download" color="primary" aria-hidden="true"></ion-icon>
-              <ion-label>הורדת גרסה {{ updates.latest() }}</ion-label>
+            <ion-item button [disabled]="updates.apkProgress() !== null" (click)="updates.installApk()">
+              @if (updates.apkProgress() !== null) {
+                <ion-spinner slot="start" name="crescent"></ion-spinner>
+                <ion-label>מוריד את גרסה {{ updates.latest() }}… {{ updates.apkProgress() }}%</ion-label>
+              } @else {
+                <ion-icon slot="start" name="download" color="primary" aria-hidden="true"></ion-icon>
+                <ion-label>התקנת גרסה {{ updates.latest() }}</ion-label>
+              }
             </ion-item>
           }
           @default {

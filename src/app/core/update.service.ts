@@ -1,6 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { SwUpdate } from '@angular/service-worker';
+import { FileOpener } from '@capacitor-community/file-opener';
 import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { ToastController } from '@ionic/angular';
 import { version } from '../../../package.json';
@@ -37,7 +39,9 @@ const AUTO_CHECK_MS = 6 * 60 * 60 * 1000;
  * - Android: the web layer comes from the latest GitHub release's www.zip,
  *   verified against GitHub's SHA-256 digest and applied on the next start.
  *   A MAJOR version bump means native code changed, so the APK itself must be
- *   installed; the prompt links to it.
+ *   installed: the app downloads it and hands it to Android's installer, which
+ *   checks it is signed like the installed app. (Through the browser the
+ *   download sat at 100% waiting to be opened by hand.)
  */
 @Injectable({ providedIn: 'root' })
 export class UpdateService {
@@ -52,6 +56,8 @@ export class UpdateService {
   readonly status = signal<UpdateStatus>('idle');
   readonly latest = signal('');
   readonly apkUrl = signal('');
+  /** The APK download's percent while it runs, otherwise null. */
+  readonly apkProgress = signal<number | null>(null);
 
   start(): void {
     if (this.native) {
@@ -154,16 +160,57 @@ export class UpdateService {
     await this.prompt(`גרסה ${latest} מוכנה.`);
   }
 
+  /** Downloads the new APK inside the app, with progress, then opens Android's installer. */
+  async installApk(): Promise<void> {
+    const url = this.apkUrl();
+    if (!url || this.apkProgress() !== null) {
+      return;
+    }
+    if (!this.native) {
+      window.open(url, '_blank');
+      return;
+    }
+    this.apkProgress.set(0);
+    const toast = await this.toastCtrl.create({ message: 'מוריד את העדכון… 0%', position: 'bottom' });
+    await toast.present();
+    const listener = await Filesystem.addListener('progress', ({ bytes, contentLength }) => {
+      if (contentLength > 0) {
+        const percent = Math.min(100, Math.round((bytes / contentLength) * 100));
+        this.apkProgress.set(percent);
+        toast.message = `מוריד את העדכון… ${percent}%`;
+      }
+    });
+    try {
+      const { path } = await Filesystem.downloadFile({
+        url,
+        path: 'update.apk',
+        directory: Directory.Cache,
+        progress: true,
+      });
+      if (!path) {
+        throw new Error('no path');
+      }
+      // The first time, Android asks to allow installs from this app, then carries on.
+      await FileOpener.open({ filePath: path, contentType: 'application/vnd.android.package-archive' });
+    } catch {
+      await this.toast('ההורדה נכשלה. בדקו את החיבור ונסו שוב.');
+    } finally {
+      await listener.remove();
+      await toast.dismiss();
+      this.apkProgress.set(null);
+    }
+  }
+
   private async prompt(message: string, needsApk = false): Promise<void> {
     const toast = await this.toastCtrl.create({
       message,
       position: 'bottom',
       buttons: [
         {
-          text: needsApk ? 'הורדה' : 'הפעלה מחדש',
+          text: needsApk ? 'עדכון' : 'הפעלה מחדש',
           handler: () => {
             if (needsApk) {
-              window.open(this.apkUrl(), '_system');
+              void this.installApk();
             } else {
               void this.apply();
             }
