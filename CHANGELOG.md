@@ -9,6 +9,14 @@ versions reach installed apps as an in-app update.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-15
+
+Needs the new APK (Settings offers the download).
+
+### Added
+- "ספר מתכונים" in the menu opens the recipe book app, or its web version
+  when it isn't installed.
+
 ## [1.5.0] - 2026-10-14
 
 ### Added

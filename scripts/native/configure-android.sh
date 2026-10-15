@@ -49,3 +49,9 @@ meta='<meta-data android:name="com.google.firebase.messaging.default_notificatio
 sed -i.orig "s|</application>|${meta}</application>|" "$manifest"
 rm "$manifest.orig"
 grep -q 'default_notification_icon' "$manifest"
+
+# The menu opens the recipe book by package name; since Android 11 an app may
+# only see the packages it declares here.
+sed -i.orig 's|<application|<queries><package android:name="com.alex99ka.recipes" /></queries><application|' "$manifest"
+rm "$manifest.orig"
+grep -q 'com.alex99ka.recipes' "$manifest"

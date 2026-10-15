@@ -16,9 +16,9 @@ import {
   IonRouterOutlet,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { home, listCircle, logOut, settings } from 'ionicons/icons';
+import { bookOutline, home, listCircle, logOut, openOutline, settings } from 'ionicons/icons';
 import { AuthService, PushService, UpdateService } from './core';
-import { AlertService } from './shared';
+import { AlertService, openApp } from './shared';
 import { CustomAlert } from './models';
 
 @Component({
@@ -49,7 +49,7 @@ export class AppComponent {
   protected readonly user = toSignal(this.auth.user$, { initialValue: null });
 
   constructor() {
-    addIcons({ listCircle, home, settings, logOut });
+    addIcons({ listCircle, home, settings, logOut, bookOutline, openOutline });
     void this.prepareNativeChrome();
     inject(UpdateService).start();
     // Re-register this device's push token whenever someone signs in.
@@ -58,6 +58,11 @@ export class AppComponent {
         void this.push.start().catch(() => undefined);
       }
     });
+  }
+
+  /** The recipe book: same Google account, same households. */
+  protected openRecipes(): void {
+    void openApp('com.alex99ka.recipes', 'https://alex-recipe-book.web.app');
   }
 
   protected confirmSignOut(): void {
