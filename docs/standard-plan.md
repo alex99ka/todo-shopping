@@ -3,6 +3,21 @@
 Written 2026-10-16 against version 3.1.0. The standard is the `make-an-app` skill
 (Defaults + `references/checklist.md`); the starter is `C:\claude projects\app-shell`.
 
+**Status 2026-10-17.** Approved 0–5 (16.10). Phase 0 done and live on the Pi. Phases 1–5
+were built together, at Alex's ask, into one prerelease, 4.0.0, on the `flutter` branch
+(`C:\claude projects\todo-flutter`); he tests it, then "promote". Where it differs from
+the text below:
+- Push switches live in `users/{uid}.notify` (the starter's shape; the owner already
+  writes that doc), not a new `prefs` collection.
+- Two home widgets (main shopping list, quick add to it), not three.
+- Photos and voice dictation are dropped: no Storage on Spark (3.x had no photo
+  buttons either), and the keyboard's microphone dictates.
+- Instead of a `hasOnly` key test, `integration_test/lists_test.dart` runs the app's own
+  writes (every repo function, both accounts of an invite) against the real rules on
+  the emulator. `backup.py --verify` compares the newest backup with the live database;
+  a full restore was tested once on the emulator.
+- The web keeps a CSP, which has to allow inline scripts for Flutter's Firebase loader.
+
 ## Path: migrate to Flutter
 
 The app is Ionic 9 / Angular 22 / Capacitor 8, so it moves to Flutter on the starter

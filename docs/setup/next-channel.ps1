@@ -10,7 +10,7 @@ if (-not $url) {
 }
 $domain = ([uri]$url).Host
 
-$h = @{ Authorization = "Bearer $(gcloud auth print-access-token)"; 'x-goog-user-project' = $p }
+$h = @{ Authorization = "Bearer $(gcloud.cmd auth print-access-token)"; 'x-goog-user-project' = $p }
 $u = "https://identitytoolkit.googleapis.com/admin/v2/projects/$p/config"
 $domains = @(@((Invoke-RestMethod $u -Headers $h).authorizedDomains) + $domain | Select-Object -Unique)
 $r = Invoke-RestMethod "$u`?updateMask=authorizedDomains" -Method Patch -Headers $h -ContentType 'application/json' -Body (@{ authorizedDomains = $domains } | ConvertTo-Json)
