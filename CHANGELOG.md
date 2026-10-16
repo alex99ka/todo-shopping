@@ -9,6 +9,8 @@ versions reach installed apps as an in-app update.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-10-16
+
 ### Changed
 - "Add to shopping list" in the recipe book opens this app on the phone, not
   the website in the browser. Needs an APK install (the update screen offers it).
