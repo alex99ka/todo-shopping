@@ -19,7 +19,7 @@ This is its own compose project. It sits next to the recipe server's stack, not 
 ```sh
 # from this PC (repo root). The key is kept outside the repo, in ~/.keystores.
 ssh -i ~/.ssh/pi5 alex99ka@pi5-home-server.local mkdir -p todo-notifier
-scp -i ~/.ssh/pi5 notifier/notify.py notifier/requirements.txt notifier/Dockerfile \
+scp -i ~/.ssh/pi5 notifier/notify.py notifier/ha_sync.py notifier/backup.py notifier/requirements.txt notifier/Dockerfile \
     notifier/docker-compose.yml notifier/.dockerignore alex99ka@pi5-home-server.local:todo-notifier/
 scp -i ~/.ssh/pi5 ~/.keystores/notifier-service-account.json \
     alex99ka@pi5-home-server.local:todo-notifier/service-account.json
@@ -52,6 +52,26 @@ HA_SYNC=<app list id>=todo.shopping_list # several: L1=todo.a,L2=todo.b
 ```
 
 The list id is the last part of the list's address in the app (`/details/<id>`). Then run `chmod 600 .env && docker compose up -d`. Keep `.env` out of the repo, since the token is a full HA login.
+
+## Daily backup
+
+`backup.py` runs at 03:45 from the Pi's crontab, in this same image:
+
+```
+45 3 * * * cd /home/alex99ka/todo-notifier && /usr/bin/docker compose run --rm notifier python backup.py >> /home/alex99ka/todo-notifier/backup.log 2>&1
+```
+
+It writes every Firestore document (subcollections too) as one JSON, encrypted, to the
+Drive folder "רשימות גיבוי" (`todo-shopping-YYYY-MM-DD.json.enc`, 30 kept), and records
+`notifier/backup`. A failure goes to the shared Telegram bot. `.env` needs `DRIVE_CLIENT_ID`,
+`DRIVE_CLIENT_SECRET`, `DRIVE_REFRESH_TOKEN` and `BACKUP_PASSPHRASE` (the same lines as the
+recipe book's backup; the passphrase is in the password manager) and `TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_CHAT_ID`.
+
+- Restore test (writes nothing): `docker compose run --rm notifier python backup.py --verify`
+- Open a backup by hand: `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE -in X.json.enc -out X.json`
+- Put it back (overwrites those documents, asks first):
+  `docker compose run --rm -v $PWD/X.json:/tmp/X.json notifier python backup.py --restore /tmp/X.json`
 
 ## Run locally
 

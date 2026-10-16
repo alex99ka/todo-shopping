@@ -29,3 +29,14 @@ jobs:
       - run: node --test 'test/unit/**/*.test.ts'
       - run: npm run test:rules
       - run: npm run test:services
+
+  notifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install -r notifier/requirements.txt
+      - run: python notifier/notify.py --selftest
+      - run: python notifier/backup.py --selftest
