@@ -2,8 +2,10 @@
 
 Firebase's free plan has no Cloud Functions, so this polls Firestore and sends
 the pushes itself: new items in a list, due reminders, a morning summary of the
-day's tasks, and new releases. It also keeps lists in sync with Home Assistant
-(ha_sync.py) when HA_TOKEN and HA_SYNC are set.
+day's tasks, and new releases, each only to people who left that type on in
+Settings (users/{uid}.notify). It forwards problem reports (Firestore `reports`)
+to Telegram, alerts there once when a job starts failing, and keeps lists in
+sync with Home Assistant (ha_sync.py) when HA_TOKEN and HA_SYNC are set.
 
   python notify.py             run forever
   python notify.py --once      one live cycle
@@ -74,6 +76,22 @@ def same_epoch(item, lst):
     """Mirrors sameEpoch() in the rules: items left behind by a deleted list
     do not belong to a list later recreated under the same id."""
     return lst is not None and item.get('listCreatedAt') == lst.get('createdAt')
+
+
+def wants(user, kind):
+    """users/{uid}.notify.<kind>: the switch in Settings, on unless turned off."""
+    notify = (user or {}).get('notify')
+    return not isinstance(notify, dict) or notify.get(kind) is not False
+
+
+def report_text(r):
+    """One Telegram message per problem report (lib/core/report.dart's fields)."""
+    lines = [f"🐞 משימות וקניות · {r.get('email')} · {r.get('version')} {r.get('platform')}",
+             str(r.get('text') or ''), '']
+    lines += [str(x) for x in (r.get('diagnostics') or [])]
+    if r.get('errors'):
+        lines += ['', 'שגיאות:'] + [str(x) for x in r['errors']]
+    return '\n'.join(lines)[:4000]
 
 
 def display_name(user, uid=None):
@@ -156,8 +174,24 @@ def send(token_snaps, title, body, path):
         log.info('push %r -> %d/%d delivered', title, resp.success_count, len(chunk))
 
 
-def tokens_of(db, uids):
-    return [s for uid in uids for s in db.collection('users').document(uid).collection('tokens').stream()]
+def tokens_of(db, uids, kind):
+    """The devices of everyone in uids who wants pushes of this kind."""
+    users = db.collection('users')
+    return [s for uid in uids if wants(users.document(uid).get().to_dict(), kind)
+            for s in users.document(uid).collection('tokens').stream()]
+
+
+def telegram(text):
+    """The shared bot: sendMessage only (another service may read its updates)."""
+    token, chat = os.environ.get('TELEGRAM_BOT_TOKEN'), os.environ.get('TELEGRAM_CHAT_ID')
+    if not token or not chat:
+        log.warning('Telegram is not set up; dropped: %s', text[:200])
+        return False
+    req = urllib.request.Request(f'https://api.telegram.org/bot{token}/sendMessage',
+                                 data=json.dumps({'chat_id': chat, 'text': text[:4000]}).encode(),
+                                 headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=20):
+        return True
 
 
 def members(db, list_id, exclude=None):
@@ -192,7 +226,7 @@ def new_items(db, st):
             continue
         user = db.collection('users').document(by).get().to_dict() if by and by != ha_sync.BY else None
         names = [i.get('name') or '' for i in group]
-        send(tokens_of(db, uids), lst.get('name') or 'רשימה', added_text(display_name(user, by), names),
+        send(tokens_of(db, uids, 'items'), lst.get('name') or 'רשימה', added_text(display_name(user, by), names),
              f'/details/{list_id}')
 
 
@@ -208,7 +242,7 @@ def reminders(db, st):
             list_id = s.reference.parent.parent.id
             lst, uids = members(db, list_id)
             if same_epoch(item, lst):
-                send(tokens_of(db, uids), 'תזכורת', item.get('name') or '', f'/details/{list_id}')
+                send(tokens_of(db, uids, 'reminders'), 'תזכורת', item.get('name') or '', f'/details/{list_id}')
         s.reference.update({'reminded': True})
 
 
@@ -246,7 +280,7 @@ def digest(db, st):
     st['digest_day'] = day
     ref.set({'lastDigest': day}, merge=True)
     for uid, (late, today) in digest_counts(rows, day_start, day_end).items():
-        send(tokens_of(db, [uid]), 'בוקר טוב', digest_text(late, today), '/home')
+        send(tokens_of(db, [uid], 'morning'), 'בוקר טוב', digest_text(late, today), '/home')
     log.info('digest %s sent', day)
 
 
@@ -283,20 +317,45 @@ def release(db, st):
         return
     if stored is not None:
         version = tag.lstrip('v')
-        send(list(db.collection_group('tokens').stream()), 'עדכון זמין',
-             f'גרסה {version} מוכנה — פתחו את האפליקציה כדי לעדכן', '/settings')
+        users = {d.id: d.to_dict() for d in db.collection('users').stream()}
+        send([t for t in db.collection_group('tokens').stream()
+               if wants(users.get(t.reference.parent.parent.id), 'updates')],
+             'עדכון זמין', f'גרסה {version} מוכנה — פתחו את האפליקציה כדי לעדכן', '/settings')
     ref.set({'lastRelease': tag}, merge=True)
     log.info('release %s stored (was %s)', tag, stored)
 
 
+def reports(db, st):
+    """Settings › דיווח על בעיה lands in `reports`; each goes to Telegram, then away.
+    Once a minute: an empty query still costs a read."""
+    if time.time() < st.get('next_reports', 0):
+        return
+    st['next_reports'] = time.time() + 60
+    for s in db.collection('reports').limit(20).stream():
+        if telegram(report_text(s.to_dict() or {})):
+            s.reference.delete()
+
+
 def cycle(db, st):
-    for step in (new_items, reminders, digest, release, ha):
+    failing = st.setdefault('failing', set())
+    for step in (new_items, reminders, digest, release, reports, ha):
         try:
             step(db, st)
+            failing.discard(step.__name__)
+            continue
         except FailedPrecondition as e:
             log.error('%s: index missing or still building, retrying next poll: %s', step.__name__, e.message)
-        except Exception:
+            error = e.message
+        except Exception as e:
             log.exception('%s failed', step.__name__)
+            error = f'{type(e).__name__}: {e}'
+        # One alert per outage, not one a poll.
+        if step.__name__ not in failing:
+            failing.add(step.__name__)
+            try:
+                telegram(f'⚠️ משימות וקניות: {step.__name__} נכשל\n{error}'[:1000])
+            except Exception:
+                log.exception('could not even send the alert')
 
 
 def selftest():
@@ -316,6 +375,15 @@ def selftest():
     assert display_name({'displayName': 'x' * 5000}) == 'x' * 60
     assert display_name(None) == 'מישהו'
     assert display_name(None, 'home-assistant') == 'Home Assistant'
+
+    # The per-type switches: on unless turned off.
+    assert wants(None, 'items') and wants({}, 'items') and wants({'notify': {'morning': False}}, 'items')
+    assert not wants({'notify': {'items': False}}, 'items')
+    assert wants({'notify': 'junk'}, 'items')
+    text = report_text({'email': 'a@b', 'version': '4.0.0', 'platform': 'android', 'text': 'נתקע',
+                        'diagnostics': ['גרסה: 4.0.0'], 'errors': ['X1 boom']})
+    assert 'נתקע' in text and 'X1 boom' in text and text.startswith('🐞')
+    assert len(report_text({'text': 'x' * 9000})) == 4000
 
     # Morning summary: per person; an item for someone in particular counts only for them.
     rows = [({'a', 'b'}, 50), ({'a', 'b'}, 150), ({'b'}, 160), ({'a'}, 999)]
