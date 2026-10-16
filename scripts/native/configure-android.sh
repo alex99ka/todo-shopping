@@ -60,3 +60,10 @@ grep -q 'com.alex99ka.recipes' "$manifest"
 sed -i.orig 's|<application|<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" /><application|' "$manifest"
 rm "$manifest.orig"
 grep -q 'REQUEST_INSTALL_PACKAGES' "$manifest"
+
+# The recipe book's "add to shopping list" link (https://alex-todo-shopping.web.app/import#...)
+# opens the app, not the browser; verified by src/.well-known/assetlinks.json on Hosting.
+link='<intent-filter android:autoVerify="true"><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="https" android:host="alex-todo-shopping.web.app" android:pathPrefix="/import" /></intent-filter>'
+sed -i.orig "s|</activity>|${link}</activity>|" "$manifest"
+rm "$manifest.orig"
+grep -q 'android:host="alex-todo-shopping.web.app"' "$manifest"
