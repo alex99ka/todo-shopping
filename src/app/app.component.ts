@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -52,6 +53,7 @@ export class AppComponent {
     addIcons({ listCircle, home, settings, logOut, bookOutline, openOutline });
     void this.prepareNativeChrome();
     inject(UpdateService).start();
+    void this.openAppLinks();
     // Re-register this device's push token whenever someone signs in.
     this.auth.user$.subscribe((user) => {
       if (user) {
@@ -81,6 +83,26 @@ export class AppComponent {
     await this.push.forget();
     await this.auth.signOut();
     await this.router.navigate(['/auth']);
+  }
+
+  /** A site link opened in the app (AndroidManifest's App Link): go to that page,
+   * keeping the fragment, which carries the recipe's groceries. */
+  private async openAppLinks(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+    // On a cold start the link can arrive both as the launch URL and as an event.
+    let last = '';
+    const go = (url?: string) => {
+      if (!url || url === last) {
+        return;
+      }
+      last = url;
+      const u = new URL(url);
+      void this.router.navigateByUrl(u.pathname + u.search + u.hash);
+    };
+    void App.addListener('appUrlOpen', (e) => go(e.url));
+    go((await App.getLaunchUrl())?.url);
   }
 
   private async prepareNativeChrome(): Promise<void> {

@@ -44,6 +44,11 @@
                 "glob": "firebase-messaging-sw.js",
                 "input": "src",
                 "output": ""
+              },
+              {
+                "glob": "assetlinks.json",
+                "input": "src/.well-known",
+                "output": ".well-known"
               }
             ],
             "styles": [

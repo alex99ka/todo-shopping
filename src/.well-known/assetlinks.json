@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.alex99ka.todoshop",
+      "sha256_cert_fingerprints": [
+        "C2:48:61:42:64:45:AF:97:CD:9D:EE:03:D6:97:7F:48:13:B2:28:94:26:15:6C:4B:EC:AD:34:D4:55:86:A4:E6"
+      ]
+    }
+  }
+]

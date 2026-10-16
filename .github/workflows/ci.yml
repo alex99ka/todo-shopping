@@ -24,6 +24,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      # The App Link (AndroidManifest) only verifies if Hosting serves this file.
+      - run: test -s www/.well-known/assetlinks.json
       - run: node --test 'test/unit/**/*.test.ts'
       - run: npm run test:rules
       - run: npm run test:services
