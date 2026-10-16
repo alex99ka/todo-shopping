@@ -1,7 +1,7 @@
 # Creates config/app (kill switch) and config/access (who gets prereleases) in Firestore.
 # Uses your gcloud login (project owner), so security rules don't apply to this write.
 $ErrorActionPreference = 'Stop'
-$h = @{ Authorization = "Bearer $(gcloud auth print-access-token)"; 'x-goog-user-project' = 'alex-todo-shopping' }
+$h = @{ Authorization = "Bearer $(gcloud.cmd auth print-access-token)"; 'x-goog-user-project' = 'alex-todo-shopping' }
 $base = 'https://firestore.googleapis.com/v1/projects/alex-todo-shopping/databases/(default)/documents'
 
 $app = @{ fields = @{ minVersion = @{ stringValue = '0.0.0' }; message = @{ stringValue = '' } } }

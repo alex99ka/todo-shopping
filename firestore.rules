@@ -88,6 +88,36 @@ service cloud.firestore {
         && d.joinedAt[uid] == request.time;
     }
 
+    // Edited by hand in the console. config/app is the kill switch, read before
+    // sign-in too; config/access names who gets prereleases. Nobody writes them
+    // from an app.
+    match /config/app {
+      allow get: if true;
+    }
+    match /config/access {
+      allow get: if signedIn();
+    }
+
+    // When the notifier's nightly backup last succeeded (Settings › מצב המערכת).
+    match /notifier/backup {
+      allow get: if signedIn();
+    }
+
+    // Settings › דיווח על בעיה: create-only; the notifier forwards each one to
+    // Telegram and deletes it. Nobody reads them back from an app.
+    match /reports/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['text', 'email', 'version', 'platform',
+                                                 'errors', 'diagnostics', 'uid', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.at == request.time
+        && request.resource.data.text is string && request.resource.data.text.size() <= 4000
+        && request.resource.data.get('errors', []) is list
+        && request.resource.data.get('errors', []).size() <= 20
+        && request.resource.data.get('diagnostics', []) is list
+        && request.resource.data.get('diagnostics', []).size() <= 30;
+    }
+
     match /users/{userId} {
       // Private: the app only ever reads and writes your own profile; the
       // notifier reads names through the Admin SDK, which bypasses rules.

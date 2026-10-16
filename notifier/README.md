@@ -10,6 +10,11 @@ Firebase's free Spark plan has no Cloud Functions, so this small Python service 
 
 Tapping a push opens the list (or Settings, for an update). Tokens that FCM reports as dead are deleted.
 
+Each type goes only to people who left it on in the app's Settings (`users/{uid}.notify`: `items`, `reminders`, `morning`, `updates`; missing means on, which is every 3.x user).
+
+- **Problem reports**: once a minute it forwards documents in `reports` (Settings › דיווח על בעיה, create-only in the rules) to the shared Telegram bot and deletes them.
+- **Job alerts**: a step that starts failing sends one Telegram message; it alerts again only after it has worked once.
+
 The service account `notifier@alex-todo-shopping.iam.gserviceaccount.com` has only `roles/datastore.user` and `roles/firebasecloudmessaging.admin`.
 
 ## Deploy on the Pi

@@ -2,38 +2,55 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, flutter]
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  app:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.4
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
-      # The App Link (AndroidManifest) only verifies if Hosting serves this file.
-      - run: test -s www/.well-known/assetlinks.json
-      - run: node --test 'test/unit/**/*.test.ts'
-      - run: npm run test:rules
-      - run: npm run test:services
+      - working-directory: firestore-tests
+        run: |
+          npm ci
+          npx --yes firebase-tools@15.15.0 emulators:exec --only firestore --project demo-todo-shopping --config ../firebase.json \
+            "node --test --test-concurrency=1 rules/*.test.ts"
 
   notifier:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
