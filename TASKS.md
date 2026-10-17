@@ -10,17 +10,15 @@ Scripts in `docs/setup/`. In a PowerShell window paste the line without the `!`;
    ```
    ssh -i $HOME\.ssh\pi5 alex99ka@pi5-home-server.local "cd ~/docker/trmnl-recipes/deploy/recipe-server && docker compose up -d"
    ```
-2. Tell me when 4.0.2 (new icon and colours, the new widget) has installed itself on your phone. Settings ›
-   עדכונים shows it; it downloads on Wi-Fi and installs a few minutes after you leave the app.
-   Friends on 4.0.0 stay there until "promote" (only you get prereleases).
-3. When it's good: "promote". Your wife's 3.x app then offers it: Update → Scan app → Install → sign in once.
+2. 4.0.2 is everyone's (promoted 2026-10-17). Your wife's 3.x app offers it: Update → Scan app →
+   Install → sign in with Google once. Friends on 4.0.0 update by themselves.
 
 ## אצל Claude
 
 - [x] Phase 0: nightly encrypted Drive backup (03:45, restore checked), notifier selftests in CI
 - [x] Phases 1–5 built on the `flutter` branch (`C:\claude projects\todo-flutter`), 4.0.0
 - [x] 4.0.1 (the recipe book's look) shipped as the in-app update test
-- [ ] At "promote": merge `flutter` into `master`, run promote.yml
+- [x] Promoted 4.0.2: `flutter` merged into `master` (the Ionic app is gone from it), live site = Flutter
 
 ## Closed
 

@@ -4,10 +4,32 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-A MAJOR version changes native code and needs a new Android APK; MINOR and PATCH
-versions reach installed apps as an in-app update.
+From 4.0.0 the entries are in Hebrew, for the people using the app: each one
+becomes the release notes and the in-app "מה חדש". Every version installs
+itself in the background (Android and Windows); the web reloads.
 
 ## [Unreleased]
+
+## [4.0.2] - 2026-10-17
+
+- וידג׳ט אחד למסך הבית במקום שניים: מעבר בין כל הרשימות (קניות ומשימות) בחצים, סימון פריט בלחיצה בלי לפתוח את האפליקציה, ו־+ שמוסיף פריט אחד וחוזר למסך הבית. וידג׳ט קיים מתעדכן לבד; את "הוספה לקניות" הישן מסירים.
+
+## [4.0.1] - 2026-10-17
+
+- מראה חדש: הסמל והצבעים של ספר המתכונים (חום, קרם, ורשימות קניות בטרקוטה).
+
+## [4.0.0] - 2026-10-17
+
+אפליקציה חדשה מבפנים, אותן רשימות. נכנסים עם Google פעם אחת.
+
+- עכשיו גם במחשב (תוכנה ל-Windows), באתר ובאייפד, לצד הטלפון.
+- מצב כהה, לפי הטלפון או לבחירה בהגדרות.
+- כניסה בטביעת אצבע (בהגדרות).
+- עדכונים יורדים ומותקנים לבד ברקע.
+- שתי וידג׳טים למסך הבית: רשימת הקניות, והוספה מהירה אליה.
+- שיתוף טקסט לאפליקציה (רשימה מצ׳אט) מוסיף את השורות לרשימה שבוחרים.
+- בהגדרות: אילו התראות לקבל, דיווח על בעיה, מצב המערכת, ייצוא כל הרשימות לאקסל, וסיור באפליקציה.
+- גיבוי מוצפן של כל הרשימות כל לילה.
 
 ## [3.1.0] - 2026-10-16
 

@@ -1,15 +1,13 @@
 name: Release
 
+# Push a tag equal to pubspec's version (1.4.0, no "v"). Builds Android,
+# Windows and web, publishes a GitHub *prerelease* (only early users'
+# apps take it: patient zero) and puts the web build on the Hosting
+# preview channel "next". promote.yml then makes it everyone's.
 on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
-  workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish the GitHub release (run from a version tag)
-        type: boolean
-        default: false
 
 permissions: {}
 
@@ -17,110 +15,91 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  FLUTTER_VERSION: 3.47.4
+
 jobs:
   version:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      code: ${{ steps.version.outputs.code }}
-      label: ${{ steps.version.outputs.label }}
-      publish: ${{ steps.version.outputs.publish }}
+      version: ${{ steps.v.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - id: version
+      - id: v
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
-          PUBLISH_INPUT: ${{ inputs.publish }}
+          TAG: ${{ github.ref_name }}
         run: |
-          version=$(node -p "require('./package.json').version")
+          version=$(sed -n 's/^version: *\([0-9.]*\).*/\1/p' pubspec.yaml)
           if [[ ! "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            echo "::error::package.json version $version is not MAJOR.MINOR.PATCH"
-            exit 1
+            echo "::error::pubspec version $version is not MAJOR.MINOR.PATCH"; exit 1
           fi
-          major=$((10#${BASH_REMATCH[1]})) minor=$((10#${BASH_REMATCH[2]})) patch=$((10#${BASH_REMATCH[3]}))
-          if (( minor > 999 || patch > 999 )); then
-            echo "::error::minor and patch must stay below 1000 for the Android versionCode"
-            exit 1
+          if (( 10#${BASH_REMATCH[2]} > 999 || 10#${BASH_REMATCH[3]} > 999 )); then
+            echo "::error::minor and patch must stay below 1000 (Android versionCode)"; exit 1
           fi
-          publish=false
-          if [ "$REF_TYPE" = tag ]; then
-            if [ "$REF_NAME" != "$version" ]; then
-              echo "::error::tag $REF_NAME does not match package.json version $version"
-              exit 1
-            fi
-            label=$version
-            if [ "$EVENT_NAME" = push ] || [ "$PUBLISH_INPUT" = true ]; then
-              publish=true
-            fi
-          else
-            if [ "$PUBLISH_INPUT" = true ]; then
-              echo "::error::publishing needs a version tag: gh workflow run release.yml --ref $version -f publish=true"
-              exit 1
-            fi
-            label="$version-${GITHUB_SHA::7}"
+          if [ "$TAG" != "$version" ]; then
+            echo "::error::tag $TAG does not match pubspec version $version"; exit 1
           fi
-          {
-            echo "version=$version"
-            echo "code=$((major * 1000000 + minor * 1000 + patch))"
-            echo "label=$label"
-            echo "publish=$publish"
-          } >> "$GITHUB_OUTPUT"
+          # This version's CHANGELOG section: the release notes and the
+          # what's-new text compiled into the app.
+          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::CHANGELOG.md has no section for [$version]"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: notes
+          path: notes.md
+          retention-days: 1
 
+  # Built with the debug key (no key.properties here); android-sign re-signs
+  # it on a runner that runs no Gradle or pub code next to the keystore.
   android:
     needs: version
     runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 45
-    env:
-      VERSION: ${{ needs.version.outputs.version }}
-      VERSION_CODE: ${{ needs.version.outputs.code }}
-      LABEL: ${{ needs.version.outputs.label }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
-      - run: npm ci
-      # cap add syncs when www exists, so the web build waits until the project is configured.
-      - run: npx cap add android
-      - run: scripts/native/configure-android.sh
-      - run: npm run build
-      - run: npx cap sync android
-      - name: Build the unsigned release APK
-        working-directory: android
-        run: ./gradlew --no-daemon assembleRelease
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: notes
+      - name: Build
+        run: |
+          flutter build apk --release --target-platform android-arm64 \
+            --dart-define=RELEASE_NOTES="$(head -c 1500 notes.md | base64 -w0)"
       - uses: actions/upload-artifact@v7
         with:
-          name: android-unsigned
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          name: android-debug-signed
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 1
 
-  # Signing runs apart from the build, so no npm or Gradle code shares a runner with the keystore.
   android-sign:
     needs: [version, android]
     runs-on: ubuntu-latest
     env:
-      LABEL: ${{ needs.version.outputs.label }}
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: android-unsigned
-          path: unsigned
+          name: android-debug-signed
+          path: in
       - name: Align, sign and verify
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -128,20 +107,20 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ vars.ANDROID_KEY_ALIAS }}
         run: |
           if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ]; then
-            echo "::error::the ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD secrets and the ANDROID_KEY_ALIAS variable are required"
-            exit 1
+            echo "::error::secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD and variable ANDROID_KEY_ALIAS are required"; exit 1
           fi
           keystore="$RUNNER_TEMP/release.keystore"
           (umask 077 && printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore")
           tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
           mkdir -p out
-          "$tools/zipalign" -P 16 -f 4 unsigned/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
-          # A PKCS12 keystore has one password for the store and the key.
+          # Drop the debug signature, then align and sign with the release key.
+          zip -q -d in/app-release.apk 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.MF' || true
+          "$tools/zipalign" -P 16 -f 4 in/app-release.apk "$RUNNER_TEMP/aligned.apk"
           "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
             --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEYSTORE_PASSWORD \
-            --out "out/todo-shopping-$LABEL.apk" "$RUNNER_TEMP/aligned.apk"
+            --out "out/todo-shopping-$VERSION.apk" "$RUNNER_TEMP/aligned.apk"
           rm -f "$keystore"
-          "$tools/apksigner" verify --verbose --print-certs "out/todo-shopping-$LABEL.apk"
+          "$tools/apksigner" verify --print-certs "out/todo-shopping-$VERSION.apk"
       - uses: actions/upload-artifact@v7
         with:
           name: release-android
@@ -149,7 +128,54 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # The web bundle the hosted app and the Android live update both run.
+  windows:
+    needs: version
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: notes
+      - name: Build
+        shell: bash
+        env:
+          GOOGLE_DESKTOP_CLIENT_ID: ${{ vars.GOOGLE_DESKTOP_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+        run: |
+          flutter build windows --release \
+            --dart-define=GOOGLE_DESKTOP_CLIENT_ID="$GOOGLE_DESKTOP_CLIENT_ID" \
+            --dart-define=GOOGLE_DESKTOP_CLIENT_SECRET="$GOOGLE_DESKTOP_CLIENT_SECRET" \
+            --dart-define=RELEASE_NOTES="$(head -c 1500 notes.md | base64 -w0)"
+          # The VC++ runtime next to the exe: starts on a PC that never installed it.
+          for f in msvcp140.dll vcruntime140.dll vcruntime140_1.dll; do
+            cp "/c/Windows/System32/$f" build/windows/x64/runner/Release/
+          done
+      - name: Installer
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress | Out-Null }
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc /Q "/DAppVersion=$env:VERSION" installer\app.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-windows
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
   web:
     needs: version
     runs-on: ubuntu-latest
@@ -160,29 +186,25 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: subosito/flutter-action@v2
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      # The updater wants index.html at the zip root and no hidden files.
-      - name: Zip the web bundle
-        working-directory: www
-        run: |
-          mkdir -p ../out
-          zip -qr ../out/www.zip . -x '.*' '*/.*'
-          unzip -l ../out/www.zip index.html
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: notes
+      - run: |
+          flutter build web --release \
+            --dart-define=RELEASE_NOTES="$(head -c 1500 notes.md | base64 -w0)"
       - uses: actions/upload-artifact@v7
         with:
-          name: release-web
-          path: out/www.zip
+          name: web
+          path: build/web
           if-no-files-found: error
           retention-days: 14
 
   release:
-    needs: [version, android-sign, web]
-    if: needs.version.outputs.publish == 'true'
+    needs: [version, android-sign, windows, web]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -196,28 +218,19 @@ jobs:
           pattern: release-*
           path: dist
           merge-multiple: true
-      - name: Publish
+      - uses: actions/download-artifact@v8
+        with:
+          name: notes
+      - name: Publish as a prerelease
         working-directory: dist
         run: |
-          files=("todo-shopping-$TAG.apk" www.zip)
+          files=(*.apk *.exe)
           sha256sum "${files[@]}" > SHA256SUMS
-          files+=(SHA256SUMS)
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "${files[@]}" --clobber
-            # Deleting a tag turns its release into a draft, and a cancelled create can leave one too.
-            if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true ]; then
-              gh release edit "$TAG" --draft=false
-            fi
-          else
-            notes=$(printf '%s\n\n' \
-              "**Android**: install todo-shopping-$TAG.apk. Every release is signed with the same key, so it updates an earlier install in place. An installed app downloads www.zip by itself, so only a new MAJOR version needs the APK." \
-              "**Web and iPhone**: open https://alex-todo-shopping.web.app. On an iPhone, add it to the Home Screen from Safari's Share menu." \
-              "Check a download with: sha256sum -c --ignore-missing SHA256SUMS")
-            gh release create "$TAG" "${files[@]}" --verify-tag --title "$TAG" --generate-notes --notes "$notes"
-          fi
+          { cat ../notes.md; printf '\n---\nAndroid: todo-shopping-%s.apk · Windows: todo-shopping-setup-%s.exe. Installed apps update themselves.\n' "$TAG" "$TAG"; } > ../body.md
+          gh release create "$TAG" "${files[@]}" SHA256SUMS --verify-tag --prerelease --title "$TAG" --notes-file ../body.md
 
-  # Runs after the release so the web app never gets ahead of the Android bundle,
-  # and installs no project dependencies so no npm code shares a runner with the deploy key.
+  # The web build goes to the preview channel "next" (early users test it
+  # there); promote.yml clones it to live. Nothing from the repo runs here.
   hosting:
     needs: [version, release]
     runs-on: ubuntu-latest
@@ -226,39 +239,27 @@ jobs:
     concurrency:
       group: hosting
       cancel-in-progress: false
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      TAG: ${{ needs.version.outputs.version }}
     steps:
-      # firebase.json holds the hosting config.
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: web
+          path: build/web
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - uses: actions/download-artifact@v8
-        with:
-          name: release-web
-          path: ${{ runner.temp }}/web
-      - name: Deploy to Firebase Hosting
+      - name: Deploy to the "next" channel
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_PROJECT: ${{ vars.FIREBASE_PROJECT }}
         run: |
-          # Republishing an older tag must not roll the web app back.
-          latest=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name)
-          if [ "$latest" != "$TAG" ]; then
-            echo "::notice::$TAG is not the latest release ($latest), so hosting stays as it is"
-            exit 0
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ] || [ -z "$FIREBASE_PROJECT" ]; then
+            echo "::error::secret FIREBASE_SERVICE_ACCOUNT and variable FIREBASE_PROJECT are required"; exit 1
           fi
-          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
-            echo "::error::the FIREBASE_SERVICE_ACCOUNT secret is required"
-            exit 1
-          fi
-          rm -rf www
-          unzip -q "$RUNNER_TEMP/web/www.zip" -d www
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           trap 'rm -f "$GOOGLE_APPLICATION_CREDENTIALS"' EXIT
           (umask 077 && printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$GOOGLE_APPLICATION_CREDENTIALS")
-          npx --yes firebase-tools@15.15.0 deploy --only hosting --project alex-todo-shopping --non-interactive
+          npx --yes firebase-tools@15.15.0 hosting:channel:deploy next --expires 30d \
+            --project "$FIREBASE_PROJECT" --non-interactive

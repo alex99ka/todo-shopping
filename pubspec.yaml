@@ -1,0 +1,80 @@
+name: todo_shopping
+description: "משימות וקניות: shared shopping and task lists for the household."
+publish_to: 'none'
+version: 4.0.2
+
+environment:
+  sdk: ^3.13.3
+
+dependencies:
+  cloud_firestore: 6.10.0
+  crypto: ^3.0.7
+  file_selector: ^1.1.0
+  firebase_auth: 6.7.0
+  firebase_core: 4.15.0
+  firebase_messaging: 16.7.0
+  flutter:
+    sdk: flutter
+  flutter_local_notifications: ^22.3.2
+  flutter_localizations:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  google_sign_in: ^7.2.0
+  home_widget: ^0.10.0
+  http: ^1.6.0
+  local_auth: ^3.0.2
+  package_info_plus: ^10.2.2
+  path_provider: ^2.1.6
+  share_plus: ^13.3.1
+  shared_preferences: ^2.5.6
+  url_launcher: ^6.3.3
+  web: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
+
+flutter:
+  uses-material-design: true
+  fonts:
+    # Hebrew sans, bundled (works offline, no runtime font fetch). OFL:
+    # assets/fonts/Rubik-OFL.txt.
+    - family: Rubik
+      fonts:
+        - asset: assets/fonts/Rubik.ttf
+
+# The icon: a checklist in a basket, in the recipe book's palette (tool/make_icon.py).
+flutter_launcher_icons:
+  image_path: assets/icon.png
+  android: true
+  adaptive_icon_background: "#B08463"
+  adaptive_icon_foreground: assets/icon_foreground.png
+  min_sdk_android: 24
+  web:
+    generate: true
+    image_path: assets/icon.png
+    background_color: "#B08463"
+    theme_color: "#B08463"
+  windows:
+    generate: true
+    image_path: assets/icon.png
+    icon_size: 256
+
+# The native splash: the light (or dark) background with the icon, as the app opens.
+flutter_native_splash:
+  color: "#FAF6F1"
+  color_dark: "#17130F"
+  image: assets/icon_foreground.png
+  android_12:
+    color: "#FAF6F1"
+    color_dark: "#17130F"
+    image: assets/icon_foreground.png
+    icon_background_color: "#B08463"
+    icon_background_color_dark: "#B08463"
+  web: false

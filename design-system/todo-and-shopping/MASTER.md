@@ -238,6 +238,12 @@ Before delivering any UI code, verify:
 
 ## Project decisions (override the generated values above)
 
+- **4.0.0 (2026-10-17, Alex): the recipe book's palette and a matching icon.** Primary brown
+  `#8F6A48` (seed `#B08463`), background cream `#FAF6F1`, ink `#2B231C`; shopping is terracotta
+  `#B4532A` (ink `#8A3A1C`, soft `#FBE7DC`), tasks the brown primary. Light + dark. Icon: a cream
+  checklist in a chestnut basket on the brown gradient (`tool/make_icon.py`). The green/amber
+  and light-only lines below describe 3.x.
+
 - **Primary is `#047857` (emerald-700), not `#059669`.** White button text on `#059669` is 3.8:1 and fails WCAG AA; on `#047857` it is 5.5:1.
 - **Light only (user's choice, 2026-10-05).** No dark mode. Background `#f6faf8`, white cards, white top bars with dark text and a hairline border (no shadow), green icons in the bars, light-mint drawer header on a white drawer. Status bar white with dark icons; `theme-color` white.
 - **Amber is an accent only** (`--app-accent-soft` / `--app-accent-ink`, `tertiary` for fills). Never as a text color on white below `#92400e`.

@@ -1,0 +1,12 @@
+{
+  "name": "todo-shopping-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-todo-shopping --config ../firebase.json \"node --test --test-concurrency=1 rules/*.test.ts\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "firebase": "12.19.0"
+  }
+}
