@@ -13,21 +13,21 @@ Scripts in `docs/setup/`. In a PowerShell window paste the line without the `!`;
    ssh -i $HOME\.ssh\pi5 alex99ka@pi5-home-server.local "sed -i 's/^TELEGRAM_CHAT_ID=.*/TELEGRAM_CHAT_ID=123456789/' ~/todo-notifier/.env ~/docker/trmnl-recipes/deploy/recipe-server/.env && cd ~/todo-notifier && docker compose up -d"
    ```
    (The recipe server picks it up at its next restart.)
-2. On the phone, open and install over 3.1.0 (Play Protect: "Scan app", Install), sign in once:
-   https://github.com/alex99ka/todo-shopping/releases/download/4.0.0/todo-shopping-4.0.0.apk
-   PC: https://github.com/alex99ka/todo-shopping/releases/download/4.0.0/todo-shopping-setup-4.0.0.exe
-   iPad: https://alex-todo-shopping--next-zjurgkce.web.app
-3. Tell me 4.0.1 arrived by itself (I ship it once you're on 4.0.0).
-4. When it's good: "promote". Your wife's 3.x app then offers it: Update → Scan app → Install → sign in once.
+2. Tell me when 4.0.1 (the new icon and colours) has installed itself on your phone. Settings ›
+   עדכונים shows it; it downloads on Wi-Fi and installs a few minutes after you leave the app.
+   Friends on 4.0.0 stay there until "promote" (only you get prereleases).
+3. When it's good: "promote". Your wife's 3.x app then offers it: Update → Scan app → Install → sign in once.
 
 ## אצל Claude
 
 - [x] Phase 0: nightly encrypted Drive backup (03:45, restore checked), notifier selftests in CI
 - [x] Phases 1–5 built on the `flutter` branch (`C:\claude projects\todo-flutter`), 4.0.0
-- [ ] After 4.0.0 is on the phone: ship 4.0.1 to prove the in-app update
+- [x] 4.0.1 (the recipe book's look) shipped as the in-app update test
 - [ ] At "promote": merge `flutter` into `master`, run promote.yml
 
 ## Closed
+
+- 2026-10-17: 4.0.0 installed on Alex's phone and friends' phones; 4.0.1 prerelease out.
 
 - 2026-10-16: audit against the standard, plan written; aligned with the recipe book's migration.
 - 2026-10-16: phases 0–5 approved; 2FA on (Google, GitHub); keystore on Drive; GitHub secrets,
