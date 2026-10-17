@@ -23,5 +23,6 @@ steps in `TASKS.md`.
 - The Pi side is `notifier/` (pushes, Home Assistant sync, reports, backup).
 - Keep green: `flutter analyze`, `flutter test`, the rules tests, the
   notifier selftests. CI runs all of them.
-- Colours only in `lib/ui/theme.dart` (a test enforces it): green for tasks,
-  amber for shopping (design-system/todo-and-shopping/MASTER.md).
+- Colours only in `lib/ui/theme.dart` (a test enforces it): the recipe book's
+  palette since 4.0.0 (brown primary for tasks and chrome, cream background,
+  terracotta for shopping). The icon is drawn by `tool/make_icon.py`.

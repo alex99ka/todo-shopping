@@ -1,7 +1,7 @@
 name: todo_shopping
 description: "משימות וקניות: shared shopping and task lists for the household."
 publish_to: 'none'
-version: 4.0.0
+version: 4.0.1
 
 environment:
   sdk: ^3.13.3
@@ -49,18 +49,18 @@ flutter:
       fonts:
         - asset: assets/fonts/Rubik.ttf
 
-# The 3.x icon: a white basket with a green check on emerald.
+# The icon: a checklist in a basket, in the recipe book's palette (tool/make_icon.py).
 flutter_launcher_icons:
   image_path: assets/icon.png
   android: true
-  adaptive_icon_background: "#047857"
+  adaptive_icon_background: "#B08463"
   adaptive_icon_foreground: assets/icon_foreground.png
   min_sdk_android: 24
   web:
     generate: true
     image_path: assets/icon.png
-    background_color: "#047857"
-    theme_color: "#047857"
+    background_color: "#B08463"
+    theme_color: "#B08463"
   windows:
     generate: true
     image_path: assets/icon.png
@@ -68,13 +68,13 @@ flutter_launcher_icons:
 
 # The native splash: the light (or dark) background with the icon, as the app opens.
 flutter_native_splash:
-  color: "#F6FAF8"
-  color_dark: "#111614"
+  color: "#FAF6F1"
+  color_dark: "#17130F"
   image: assets/icon_foreground.png
   android_12:
-    color: "#F6FAF8"
-    color_dark: "#111614"
+    color: "#FAF6F1"
+    color_dark: "#17130F"
     image: assets/icon_foreground.png
-    icon_background_color: "#047857"
-    icon_background_color_dark: "#047857"
+    icon_background_color: "#B08463"
+    icon_background_color_dark: "#B08463"
   web: false

@@ -4,38 +4,43 @@ import 'package:flutter/material.dart';
 /// [AppTokens]; test/theme_test.dart fails on any colour not listed here.
 /// A new app replaces these values with its approved palette.
 abstract final class AppTokens {
-  static const seed = Color(0xFF047857);
+  /// The recipe book's palette (its brown, cream and chestnut), so the two
+  /// household apps look like one family.
+  static const seed = Color(0xFFB08463);
 
-  static const lightBg = Color(0xFFF6FAF8);
+  /// Light-mode buttons: the softest brown that keeps white text at 4.5:1.
+  static const lightPrimary = Color(0xFF8F6A48);
+
+  static const lightBg = Color(0xFFFAF6F1);
   static const lightCard = Color(0xFFFFFFFF);
-  static const lightInk = Color(0xFF1F2A26);
-  static const lightMuted = Color(0xFF5B6B65);
+  static const lightInk = Color(0xFF2B231C);
+  static const lightMuted = Color(0xFF6E6157);
 
-  static const darkBg = Color(0xFF111614);
-  static const darkCard = Color(0xFF1B2220);
-  static const darkInk = Color(0xFFE7EFEC);
-  static const darkMuted = Color(0xFF9AAAA4);
+  static const darkBg = Color(0xFF17130F);
+  static const darkCard = Color(0xFF221C17);
+  static const darkInk = Color(0xFFF1EAE2);
+  static const darkMuted = Color(0xFFB3A698);
 
   static const danger = Color(0xFFB42318);
   static const dangerDark = Color(0xFFF97066);
 
   /// Skeleton placeholders.
-  static const skeletonLight = Color(0xFFE4ECE8);
-  static const skeletonDark = Color(0xFF26302D);
+  static const skeletonLight = Color(0xFFEEE5DA);
+  static const skeletonDark = Color(0xFF2E2620);
 
-  /// Shopping lists are amber (fills only; text on white never lighter than
-  /// [accentInk]), tasks green: design-system/todo-and-shopping/MASTER.md.
-  static const accent = Color(0xFFD97706);
-  static const accentInk = Color(0xFF92400E);
-  static const accentSoft = Color(0xFFFEF3C7);
-  static const accentDark = Color(0xFFF59E0B);
-  static const accentInkDark = Color(0xFFFCD34D);
-  static const accentSoftDark = Color(0xFF3A2A12);
+  /// Shopping lists are terracotta (the icon's chestnut), tasks the brown
+  /// primary. Text in the shopping colour uses [accentInk].
+  static const accent = Color(0xFFB4532A);
+  static const accentInk = Color(0xFF8A3A1C);
+  static const accentSoft = Color(0xFFFBE7DC);
+  static const accentDark = Color(0xFFE08A5F);
+  static const accentInkDark = Color(0xFFF4B793);
+  static const accentSoftDark = Color(0xFF3A2219);
   static const dangerSoft = Color(0xFFFEE4E2);
   static const dangerSoftDark = Color(0xFF3B1A17);
 
   static const all = <Color>[
-    seed, lightBg, lightCard, lightInk, lightMuted, darkBg, darkCard, darkInk,
+    seed, lightPrimary, lightBg, lightCard, lightInk, lightMuted, darkBg, darkCard, darkInk,
     darkMuted, danger, dangerDark, skeletonLight, skeletonDark, accent, accentInk,
     accentSoft, accentDark, accentInkDark, accentSoftDark, dangerSoft, dangerSoftDark,
   ];
@@ -47,6 +52,7 @@ ThemeData appTheme(Brightness brightness) {
     seedColor: AppTokens.seed,
     brightness: brightness,
   ).copyWith(
+    primary: dark ? null : AppTokens.lightPrimary,
     surface: dark ? AppTokens.darkCard : AppTokens.lightCard,
     onSurface: dark ? AppTokens.darkInk : AppTokens.lightInk,
     onSurfaceVariant: dark ? AppTokens.darkMuted : AppTokens.lightMuted,

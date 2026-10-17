@@ -12,7 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="start"
-        android:textColor="#047857"
+        android:textColor="#8F6A48"
         android:textSize="16sp"
         android:textStyle="bold" />
     <TextView
@@ -23,7 +23,7 @@
         android:ellipsize="end"
         android:gravity="start"
         android:maxLines="3"
-        android:textColor="#1F2A26"
+        android:textColor="#2B231C"
         android:textDirection="rtl"
         android:textSize="14sp" />
 </LinearLayout>
