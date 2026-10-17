@@ -5,15 +5,12 @@ Scripts in `docs/setup/`. In a PowerShell window paste the line without the `!`;
 
 ## עליך
 
-1. Telegram: the chat id copied from the recipe server is the bot's own name, so Telegram
-   refuses ("the bot can't send messages to the bot"); the recipe server's reports never arrived
-   either. In Telegram: press Start on @AlexPiMonitor_bot, then message @userinfobot and send me
-   the number it answers (not a secret), or put it in yourself (replace 123456789):
+1. Recipe server: its `.env` now has the right Telegram chat id (937317693) but it reads it only
+   at start. Restart it when convenient (its problem reports then reach you):
    ```
-   ssh -i $HOME\.ssh\pi5 alex99ka@pi5-home-server.local "sed -i 's/^TELEGRAM_CHAT_ID=.*/TELEGRAM_CHAT_ID=123456789/' ~/todo-notifier/.env ~/docker/trmnl-recipes/deploy/recipe-server/.env && cd ~/todo-notifier && docker compose up -d"
+   ssh -i $HOME\.ssh\pi5 alex99ka@pi5-home-server.local "cd ~/docker/trmnl-recipes/deploy/recipe-server && docker compose up -d"
    ```
-   (The recipe server picks it up at its next restart.)
-2. Tell me when 4.0.1 (the new icon and colours) has installed itself on your phone. Settings ›
+2. Tell me when 4.0.2 (new icon and colours, the new widget) has installed itself on your phone. Settings ›
    עדכונים shows it; it downloads on Wi-Fi and installs a few minutes after you leave the app.
    Friends on 4.0.0 stay there until "promote" (only you get prereleases).
 3. When it's good: "promote". Your wife's 3.x app then offers it: Update → Scan app → Install → sign in once.
@@ -26,6 +23,9 @@ Scripts in `docs/setup/`. In a PowerShell window paste the line without the `!`;
 - [ ] At "promote": merge `flutter` into `master`, run promote.yml
 
 ## Closed
+
+- 2026-10-17: Telegram chat id fixed (937317693); problem reports reach Telegram. 4.0.2: one
+  widget (flip lists, cross off, add one).
 
 - 2026-10-17: 4.0.0 installed on Alex's phone and friends' phones; 4.0.1 prerelease out.
 
