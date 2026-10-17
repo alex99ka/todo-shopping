@@ -8,13 +8,20 @@ other. When both sides changed the same item, the app wins. Only the name and th
 done state cross over; the app keeps aisles, deadlines and the rest to itself.
 
 Uses HA's REST API with a long-lived access token (HA_URL, HA_TOKEN).
+
+The app side is a Firestore listener, not a read per poll: polling every item
+every 30 s used the whole free read quota once the list grew past ~17 items.
+A poll now costs no Firestore reads; each change costs one.
 """
 
 import json
 import logging
 import os
+import threading
 import time
 import urllib.request
+
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 log = logging.getLogger('notifier.ha')
 
@@ -116,20 +123,64 @@ def ha_status(done):
 
 # --- sync one pair ---
 
-def sync_list(db, list_id, entity, now_ms):
-    lst = db.collection('lists').document(list_id).get().to_dict()
-    if lst is None:
+WATCH_FOR_S = 3600  # the list doc (its createdAt) is re-read and the listener renewed hourly
+
+
+class Watch:
+    """The list's items, kept current by a Firestore listener on another thread."""
+
+    def __init__(self, db, list_id):
+        self.lst = db.collection('lists').document(list_id).get().to_dict()
+        self.items, self.lock, self.ready = {}, threading.Lock(), threading.Event()
+        self.until = time.time() + WATCH_FOR_S
+        self.watch = None
+        if self.lst is not None:
+            q = (db.collection('lists').document(list_id).collection('items')
+                 .where(filter=FieldFilter('listCreatedAt', '==', self.lst.get('createdAt'))))
+            self.watch = q.on_snapshot(self._changed)
+
+    def _changed(self, _docs, changes, _read_time):
+        with self.lock:
+            for c in changes:
+                if c.type.name == 'REMOVED':
+                    self.items.pop(c.document.id, None)
+                else:
+                    d = c.document.to_dict()
+                    self.items[c.document.id] = ((d.get('name') or '').strip(), bool(d.get('state')))
+        self.ready.set()
+
+    def snapshot(self):
+        if not self.ready.wait(60):
+            raise OSError('Firestore listener not ready')
+        with self.lock:
+            return dict(self.items)
+
+    def close(self):
+        if self.watch:
+            self.watch.unsubscribe()
+
+
+def sync_list(db, list_id, entity, now_ms, st):
+    watches = st.setdefault('ha_watch', {})
+    w = watches.get(list_id)
+    if w is None or time.time() > w.until:
+        if w:
+            w.close()
+        w = watches[list_id] = Watch(db, list_id)
+    if w.lst is None:
         log.warning('HA sync: list %s does not exist', list_id)
         return
+    lst = w.lst
     items_ref = db.collection('lists').document(list_id).collection('items')
-    app = {s.id: ((d.get('name') or '').strip(), bool(d.get('state')))
-           for s in items_ref.stream() for d in [s.to_dict()]
-           if d.get('listCreatedAt') == lst.get('createdAt')}
+    app = w.snapshot()
     ha = ha_items(entity)
     state_ref = db.document(f'notifier/ha-{list_id}')
-    pairs = (state_ref.get().to_dict() or {}).get('pairs', {})
+    saved = st.setdefault('ha_pairs', {})
+    if list_id not in saved:
+        saved[list_id] = (state_ref.get().to_dict() or {}).get('pairs', {})
+    before = json.dumps(saved[list_id], sort_keys=True)
 
-    ops, pairs = plan(app, ha, pairs)
+    ops, pairs = plan(app, ha, saved[list_id])
     added = {}
     for op in ops:
         kind = op[0]
@@ -166,7 +217,10 @@ def sync_list(db, list_id, entity, now_ms):
                     call('update_item', {'entity_id': entity, 'item': uid, 'status': 'completed'})
                 pairs[item_id] = {'uid': uid, 'name': name, 'done': done}
 
-    state_ref.set({'pairs': pairs, 'entity': entity, 'synced': now_ms()})
+    saved[list_id] = pairs
+    # Written only when something changed: a write per poll was 2,880 a day.
+    if ops or json.dumps(pairs, sort_keys=True) != before:
+        state_ref.set({'pairs': pairs, 'entity': entity, 'synced': now_ms()})
     if ops:
         log.info('HA sync %s <-> %s: %d change(s)', list_id, entity, len(ops))
 
@@ -177,7 +231,7 @@ def sync(db, now_ms, st):
         return
     for list_id, entity in pairs.items():
         try:
-            sync_list(db, list_id, entity, now_ms)
+            sync_list(db, list_id, entity, now_ms, st)
             st.pop('ha_down', None)
         except OSError as e:
             # HA restarting or the network blipped: say so once, keep polling.
