@@ -134,6 +134,13 @@ service cloud.firestore {
       }
     }
 
+    // Who you can add to a list directly: `people` are your recipe-book friends
+    // (written by the recipe server), `mates` everyone sharing a household with
+    // you (written by the notifier). Both are {uid: {name}}; only servers write.
+    match /friends/{userId} {
+      allow get: if signedIn() && request.auth.uid == userId;
+    }
+
     match /households/{householdId} {
       function isOwner() {
         return signedIn() && request.auth.uid == resource.data.ownerUid;
@@ -218,13 +225,31 @@ service cloud.firestore {
           && validHousehold();
       }
 
+      // Anyone who can use the list adds people from their friends: only new uids,
+      // each with a joinedAt, and each in their friends/{uid}.
+      function isFriendAdd() {
+        let d = request.resource.data;
+        let added = d.memberUids.toSet().difference(resource.data.memberUids.toSet());
+        let path = /databases/$(database)/documents/friends/$(request.auth.uid);
+        return canUseList(resource.data)
+          && changedKeys().hasOnly(['memberUids', 'joinedAt'])
+          && d.memberUids.size() == d.memberUids.toSet().size()
+          && d.memberUids.toSet().hasAll(resource.data.memberUids)
+          && added.size() > 0 && added.size() <= 20
+          && d.joinedAt.diff(resource.data.joinedAt).affectedKeys() == added
+          && exists(path)
+          && added.difference(get(path).data.get('people', {}).keys().toSet()
+                .union(get(path).data.get('mates', {}).keys().toSet())).size() == 0;
+      }
+
       allow delete: if isOwner();
       allow update: if (isOwner()
                         && changedKeys().hasOnly(['name', 'date', 'householdId', 'householdCreatedAt'])
                         && validMutableFields() && validHousehold())
                     || isSelfRemoval()
                     || isInvitedJoin('list', listId)
-                    || isMerge();
+                    || isMerge()
+                    || isFriendAdd();
 
       function listDoc() {
         return get(/databases/$(database)/documents/lists/$(listId)).data;

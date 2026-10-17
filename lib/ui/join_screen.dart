@@ -32,6 +32,7 @@ class _JoinScreenState extends State<JoinScreen> {
     setState(() => _busy = true);
     try {
       final listId = await joinInvite(widget.inviteId, inv);
+      if (listId != null) befriendInviter(widget.inviteId);
       if (!mounted) return;
       Navigator.pushReplacement(
         context,

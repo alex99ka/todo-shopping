@@ -13,11 +13,18 @@ Scripts in `docs/setup/`. In a PowerShell window paste the line without the `!`;
 2. 4.0.2 is everyone's (promoted 2026-10-17). Your wife's 3.x app offers it: Update → Scan app →
    Install → sign in with Google once. Friends on 4.0.0 update by themselves.
 
+3. Shared friends (built, not live). Say "deploy" for the rules and the notifier, and "release"
+   for 4.1.0. Then paste `docs/recipe-friends-handoff.md` into the recipe book's session: until it
+   ships, adding housemates works, but recipe friends don't show up yet.
+
 ## אצל Claude
 
 - [x] Phase 0: nightly encrypted Drive backup (03:45, restore checked), notifier selftests in CI
 - [x] Phases 1–5 built on the `flutter` branch (`C:\claude projects\todo-flutter`), 4.0.0
 - [x] 4.0.1 (the recipe book's look) shipped as the in-app update test
+- [x] Shared friends, the to-do side: `friends/{uid}` + rule `isFriendAdd` (rules tests 118), the
+  notifier writes `mates`, the "add people" sheet, friends on the Households screen; the recipe
+  server's part is in `docs/recipe-friends-handoff.md`
 - [x] Promoted 4.0.2: `flutter` merged into `master` (the Ionic app is gone from it), live site = Flutter
 
 ## Closed

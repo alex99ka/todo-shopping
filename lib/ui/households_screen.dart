@@ -54,20 +54,36 @@ class HouseholdsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _unfriend(BuildContext context, Friend f) async {
+    if (!await confirm(context, 'להסיר את ${f.name}?',
+        'גם בספר המתכונים. הרשימות המשותפות נשארות, עד שמישהו עוזב אותן.', 'הסרה')) {
+      return;
+    }
+    try {
+      await unfriend(f.uid);
+      toast('החבר הוסר');
+    } catch (e) {
+      fail(e, 'ההסרה נכשלה');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('משקי בית')),
+      appBar: AppBar(title: const Text('משקי בית וחברים')),
       floatingActionButton: FloatingActionButton(
         tooltip: 'משק בית חדש',
         onPressed: () => _create(context),
         child: const Icon(Icons.add),
       ),
-      body: ListenableBuilder(
-        listenable: Lists.instance,
-        builder: (context, _) {
+      body: StreamBuilder<List<Friend>>(
+        stream: friends(),
+        builder: (context, snap) => ListenableBuilder(
+          listenable: Lists.instance,
+          builder: (context, _) {
           final houses = Lists.instance.households;
+          final people = snap.data ?? const <Friend>[];
           return ListView(padding: const EdgeInsets.only(bottom: 96), children: [
             Padding(
               padding: const EdgeInsets.all(16),
@@ -96,8 +112,34 @@ class HouseholdsScreen extends StatelessWidget {
                   onLongPress: () => _menu(context, h),
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
+              child: Text('חברים', style: t.textTheme.titleMedium),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'אותם חברים כמו בספר המתכונים. כל מי שבמשק בית שלך חבר אוטומטית, ומי שמצטרף '
+                'לרשימה דרך קישור שלך נהיה חבר. אפשר להוסיף חברים לרשימה בלי קישור.',
+                style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
+              ),
+            ),
+            for (final f in people)
+              ListTile(
+                leading: Icon(f.mate ? Icons.home_outlined : Icons.person_outline),
+                title: Text(f.name.isEmpty ? 'ללא שם' : f.name),
+                subtitle: f.mate ? const Text('ממשק הבית') : null,
+                trailing: f.mate
+                    ? null
+                    : IconButton(
+                        tooltip: 'הסרת החבר',
+                        icon: const Icon(Icons.person_remove_outlined),
+                        onPressed: () => _unfriend(context, f),
+                      ),
+              ),
           ]);
-        },
+          },
+        ),
       ),
     );
   }

@@ -21,6 +21,7 @@ import 'households_screen.dart';
 import 'import_screen.dart';
 import 'join_screen.dart';
 import 'list_screen.dart';
+import 'people_sheet.dart';
 import 'settings_page.dart';
 import 'share_screen.dart';
 import 'skeleton.dart';
@@ -207,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     switch (action) {
       case 'invite':
-        await shareInvite('list', l.id, l.name);
+        await addPeople(context, l);
       case 'rename':
         final name = await askText(context, 'שינוי שם', initial: l.name);
         if (name != null) renameList(l.id, name).catchError((Object e) => fail(e, 'שינוי השם נכשל'));
@@ -300,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
           TourTarget(
             'home.households',
             child: IconButton(
-              tooltip: 'משקי בית',
+              tooltip: 'משקי בית וחברים',
               icon: const Icon(Icons.home_outlined),
               onPressed: () => Navigator.push(
                   context, MaterialPageRoute<void>(builder: (_) => const HouseholdsScreen())),

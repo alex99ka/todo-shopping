@@ -9,14 +9,16 @@ import 'errors.dart';
 bool get hasServer => AppConfig.serverUrl.isNotEmpty;
 
 /// Calls the home server with the signed-in user's Firebase ID token, which
-/// the server checks on every route. Every call has a timeout.
+/// the server checks on every route ([base]: another server of Alex's that
+/// takes this project's tokens, like the recipe book's). Every call has a timeout.
 Future<Map<String, dynamic>> server(
   String method,
   String path, [
   Map<String, dynamic>? body,
+  String? base,
 ]) async {
   final token = await FirebaseAuth.instance.currentUser?.getIdToken();
-  final req = http.Request(method, Uri.parse('${AppConfig.serverUrl}$path'))
+  final req = http.Request(method, Uri.parse('${base ?? AppConfig.serverUrl}$path'))
     ..headers['Content-Type'] = 'application/json';
   if (token != null) req.headers['Authorization'] = 'Bearer $token';
   if (body != null) req.body = jsonEncode(body);

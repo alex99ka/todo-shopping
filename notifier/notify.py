@@ -84,6 +84,16 @@ def wants(user, kind):
     return not isinstance(notify, dict) or notify.get(kind) is not False
 
 
+def mates_of(households):
+    """Everyone sharing a household with each member: their friends/{uid}.mates."""
+    out = {}
+    for h in households:
+        ms = set(h.get('memberUids') or [])
+        for m in ms:
+            out.setdefault(m, set()).update(ms - {m})
+    return out
+
+
 def report_text(r):
     """One Telegram message per problem report (lib/core/report.dart's fields)."""
     lines = [f"🐞 משימות וקניות · {r.get('email')} · {r.get('version')} {r.get('platform')}",
@@ -336,9 +346,39 @@ def reports(db, st):
             s.reference.delete()
 
 
+def mates(db, st):
+    """Housemates are friends, so the app can add them to a list directly
+    (firestore.rules isFriendAdd). A listener on households marks a change;
+    only then are they read again."""
+    if 'mates_watch' not in st:
+        st['mates_dirty'] = True
+        st['mates'] = {d.id: set((d.to_dict() or {}).get('mates') or {}) for d in db.collection('friends').stream()}
+        st['mates_watch'] = db.collection('households').on_snapshot(
+            lambda *_: st.__setitem__('mates_dirty', True))
+    if not st['mates_dirty']:
+        return
+    st['mates_dirty'] = False
+    try:
+        want = mates_of(d.to_dict() or {} for d in db.collection('households').stream())
+        names = {}
+        # shortcut: a renamed housemate keeps the old name here until the household changes.
+        for uid in set(want) | set(st['mates']):
+            new = want.get(uid, set())
+            if new == st['mates'].get(uid, set()):
+                continue
+            for m in new - names.keys():
+                names[m] = display_name(db.collection('users').document(m).get().to_dict())
+            db.collection('friends').document(uid).set({'mates': {m: {'name': names[m]} for m in new}},
+                                                       merge=['mates'])
+            st['mates'][uid] = new
+    except Exception:
+        st['mates_dirty'] = True
+        raise
+
+
 def cycle(db, st):
     failing = st.setdefault('failing', set())
-    for step in (new_items, reminders, digest, release, reports, ha):
+    for step in (new_items, reminders, digest, release, reports, mates, ha):
         try:
             step(db, st)
             failing.discard(step.__name__)
@@ -374,6 +414,7 @@ def selftest():
     assert not same_epoch({'listCreatedAt': 'T0'}, None)
     assert display_name({'displayName': 'x' * 5000}) == 'x' * 60
     assert display_name(None) == 'מישהו'
+    assert mates_of([{'memberUids': ['a', 'b']}, {'memberUids': ['a', 'c']}, {}]) ==         {'a': {'b', 'c'}, 'b': {'a'}, 'c': {'a'}}
     assert display_name(None, 'home-assistant') == 'Home Assistant'
 
     # The per-type switches: on unless turned off.

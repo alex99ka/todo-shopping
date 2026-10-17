@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/server.dart';
 import 'logic.dart';
 
 /// Firestore, in the shapes the rules (firestore.rules) and the 3.x app use.
@@ -564,3 +565,36 @@ Future<String?> joinInvite(String inviteId, Invite inv) async {
   }
   return inv.kind == 'list' ? inv.targetId : null;
 }
+
+// ---- friends ----
+
+/// Shared with the recipe book: its server keeps friends/{uid}.people (its
+/// friendships) and the notifier .mates (everyone in your households). The
+/// rules let you add any of them to a list you can use.
+typedef Friend = ({String uid, String name, bool mate});
+
+/// The recipe book's server, which owns the friendships.
+const recipeApi = 'https://pi5-home-server-ts.tail4f470e.ts.net/api/v1';
+
+Stream<List<Friend>> friends() => _db.doc('friends/$uid').snapshots().map((s) {
+      Map<String, dynamic> of(String key) => (s.data()?[key] as Map?)?.cast<String, dynamic>() ?? {};
+      String name(Object? v) => '${(v as Map?)?['name'] ?? ''}';
+      final people = of('people'), mates = of('mates');
+      return [
+        for (final e in mates.entries) (uid: e.key, name: name(e.value), mate: true),
+        for (final e in people.entries)
+          if (!mates.containsKey(e.key)) (uid: e.key, name: name(e.value), mate: false),
+      ]..sort((a, b) => a.name.compareTo(b.name));
+    });
+
+Future<void> addToList(String listId, List<String> uids) => _db.doc('lists/$listId').update({
+      'memberUids': FieldValue.arrayUnion(uids),
+      for (final u in uids) FieldPath(['joinedAt', u]): FieldValue.serverTimestamp(),
+    });
+
+/// Joining a list through someone's link also makes you their friend, in both
+/// apps. Best effort: the list works without it.
+Future<void> befriendInviter(String inviteId) =>
+    server('POST', '/friends/from-invite', {'inviteId': inviteId}, recipeApi).then((_) {}, onError: (_) {});
+
+Future<void> unfriend(String friendUid) => server('DELETE', '/friends/$friendUid', null, recipeApi);

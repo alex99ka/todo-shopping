@@ -12,6 +12,7 @@ import '../lists/repo.dart';
 import 'common.dart';
 import 'home_screen.dart';
 import 'item_sheet.dart';
+import 'people_sheet.dart';
 import 'skeleton.dart';
 import 'theme.dart';
 
@@ -324,7 +325,7 @@ class _ListScreenState extends State<ListScreen> {
     try {
       switch (a) {
         case 'invite':
-          await shareInvite('list', l.id, l.name);
+          await addPeople(context, l);
         case 'main':
           await _makeMain(l);
         case 'rename':
