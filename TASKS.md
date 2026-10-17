@@ -13,9 +13,8 @@ Scripts in `docs/setup/`. In a PowerShell window paste the line without the `!`;
 2. 4.0.2 is everyone's (promoted 2026-10-17). Your wife's 3.x app offers it: Update → Scan app →
    Install → sign in with Google once. Friends on 4.0.0 update by themselves.
 
-3. Shared friends: rules and notifier live, 4.1.0 released as a prerelease (yours only). Test it,
-   then say "promote 4.1.0". Paste `docs/recipe-friends-handoff.md` into the recipe book's session:
-   until it ships, adding housemates works, but recipe friends don't show up yet.
+3. Shared friends: 4.1.0 is everyone's (promoted 2026-10-17). Left: paste
+   `docs/recipe-friends-handoff.md` into the recipe book's session, so recipe friends show up here.
 
 ## אצל Claude
 
