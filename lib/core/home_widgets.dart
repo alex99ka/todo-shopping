@@ -1,67 +1,57 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 
-/// Android home screen widgets (android/.../HomeWidgets.kt): a summary and a
-/// quick-add button. While the app runs it keeps the summary's data fresh.
-/// A new app replaces both with its own 2–3 (today / a key number / quick
-/// actions) and keeps this plumbing.
+/// The Android home screen widget (android/.../HomeWidgets.kt). This is the
+/// plumbing; what it shows and does is lib/lists/widget.dart.
 const _package = 'com.alex99ka.todoshop';
-const widgets = {'SummaryWidget': 'רשימת הקניות', 'QuickAddWidget': 'הוספה לקניות'};
+const _widget = 'SummaryWidget';
 
 bool get homeWidgetsSupported =>
     !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
 String? _last;
 
-/// Cheap to call on every rebuild: writes only when the data changed.
-void updateHomeWidgets(
-    {required String list, required int open, List<String> titles = const []}) {
-  if (!homeWidgetsSupported) return;
-  final data = jsonEncode({'list': list, 'open': open, 'titles': titles.take(3).toList()});
-  if (data == _last) return;
+/// Hands the widget its data (a JSON string) and redraws it. Cheap to call on
+/// every change: writes only when the data changed.
+Future<void> pushWidgetData(String data) async {
+  if (!homeWidgetsSupported || data == _last) return;
   _last = data;
-  () async {
-    try {
-      await HomeWidget.saveWidgetData('summary', data);
-      await HomeWidget.updateWidget(
-          qualifiedAndroidName: '$_package.SummaryWidget');
-    } catch (_) {} // the widget keeps its last data
-  }();
+  try {
+    await HomeWidget.saveWidgetData('lists', data);
+    await HomeWidget.updateWidget(qualifiedAndroidName: '$_package.$_widget');
+  } catch (_) {} // the widget keeps its last data
 }
 
-/// Taps on a widget open the app with `todoshopping://<action>`; [onAction] gets
-/// the action ("add", "open"), also when the tap is what launched the app.
-StreamSubscription<Uri?>? listenWidgetTaps(void Function(String action) onAction) {
+/// Taps on the widget that open the app (`todoshopping://add?list=…`,
+/// `…open?list=…`), also when the tap is what launched it.
+StreamSubscription<Uri?>? listenWidgetTaps(void Function(Uri uri) onTap) {
   if (!homeWidgetsSupported) return null;
   HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
-    if (uri != null) onAction(uri.host);
+    if (uri != null) onTap(uri);
   });
   return HomeWidget.widgetClicked.listen((uri) {
-    if (uri != null) onAction(uri.host);
+    if (uri != null) onTap(uri);
   });
+}
+
+/// Taps handled without opening the app run [callback] in the background.
+Future<void> registerWidgetCallback(FutureOr<void> Function(Uri?) callback) async {
+  if (!homeWidgetsSupported) return;
+  try {
+    await HomeWidget.registerInteractivityCallback(callback);
+  } catch (_) {}
 }
 
 /// Settings › "הוספת וידג׳ט": the launcher's own pin dialog, or how to add
 /// it by hand where the launcher can't.
 Future<void> pinHomeWidget(BuildContext context) async {
   final messenger = ScaffoldMessenger.of(context);
-  final name = await showModalBottomSheet<String>(
-    context: context,
-    builder: (c) => SafeArea(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        for (final e in widgets.entries)
-          ListTile(title: Text(e.value), onTap: () => Navigator.pop(c, e.key)),
-      ]),
-    ),
-  );
-  if (name == null) return;
   try {
     if (await HomeWidget.isRequestPinWidgetSupported() == true) {
-      await HomeWidget.requestPinWidget(qualifiedAndroidName: '$_package.$name');
+      await HomeWidget.requestPinWidget(qualifiedAndroidName: '$_package.$_widget');
       return;
     }
   } catch (_) {}

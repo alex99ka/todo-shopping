@@ -15,6 +15,7 @@ import '../core/update.dart';
 import '../core/web_update.dart';
 import '../lists/links.dart';
 import '../lists/repo.dart';
+import '../lists/widget.dart';
 import 'common.dart';
 import 'households_screen.dart';
 import 'import_screen.dart';
@@ -136,22 +137,20 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ShareScreen(text: text)));
   }
 
-  /// The home widgets: "add" opens the main list ready to type, "open" shows it.
-  void _widgetAction(String action) {
-    final main = mainShoppingList();
-    if (main == null || !mounted) return;
+  /// The home widget's + opens its list ready for one item (the app closes
+  /// after it); its title opens the list.
+  void _widgetAction(Uri uri) {
+    final id = uri.queryParameters['list'] ?? mainShoppingList()?.id;
+    if (id == null || !mounted) return;
     Navigator.of(context).popUntil((r) => r.isFirst);
+    final add = uri.host == 'add';
     Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => ListScreen(listId: main.id, focusAdd: action == 'add')));
+        builder: (_) => ListScreen(listId: id, focusAdd: add, closeAfterAdd: add)));
   }
 
   void _updateWidgets() {
-    final main = mainShoppingList();
-    if (main == null) return;
-    final open = (Lists.instance.itemsOf(main.id) ?? []).where((i) => !i.done).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-    updateHomeWidgets(
-        list: main.name, open: open.length, titles: [for (final i in open.take(3)) i.name]);
+    final store = Lists.instance;
+    pushWidgetData(widgetJson(store.all, store.itemsOf, store.mainListId));
   }
 
   @override

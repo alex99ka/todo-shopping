@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,9 +18,13 @@ import 'theme.dart';
 /// One list. Shopping: what's left in aisle order, the basket folded away,
 /// the whole row ticks (the pencil edits). Tasks: by deadline, a tap edits.
 class ListScreen extends StatefulWidget {
-  const ListScreen({super.key, required this.listId, this.focusAdd = false});
+  const ListScreen(
+      {super.key, required this.listId, this.focusAdd = false, this.closeAfterAdd = false});
   final String listId;
   final bool focusAdd;
+
+  /// Opened by the home widget's +: one item, then back to the home screen.
+  final bool closeAfterAdd;
 
   @override
   State<ListScreen> createState() => _ListScreenState();
@@ -115,6 +120,14 @@ class _ListScreenState extends State<ListScreen> {
       if (c != null) aisles.add(categoryLabels[c] ?? c);
     }
     _add.clear();
+    if (widget.closeAfterAdd) {
+      // Saved on the device at once; give it a moment to reach the server, then close.
+      FirebaseFirestore.instance
+          .waitForPendingWrites()
+          .timeout(const Duration(seconds: 4), onTimeout: () {})
+          .whenComplete(SystemNavigator.pop);
+      return;
+    }
     _addFocus.requestFocus();
     if (entries.length > 1) {
       toast('נוספו ${entries.length} פריטים', duration: const Duration(milliseconds: 1500));

@@ -13,6 +13,7 @@ import 'core/app_info.dart';
 import 'core/errors.dart';
 import 'core/lock.dart';
 import 'core/remote_config.dart';
+import 'core/home_widgets.dart';
 import 'core/settings_store.dart';
 import 'core/share_in.dart';
 import 'core/tour.dart';
@@ -20,6 +21,7 @@ import 'core/update.dart';
 import 'core/web_update.dart';
 import 'firebase_options.dart';
 import 'lists/links.dart';
+import 'lists/widget.dart';
 import 'ui/common.dart';
 import 'ui/gates.dart';
 import 'ui/theme.dart';
@@ -71,6 +73,8 @@ Future<void> main() async {
       );
     }
     RemoteConfig.instance.listen();
+    // The home widget's taps (cross off, flip) run lib/lists/widget.dart in the background.
+    registerWidgetCallback(widgetBackground);
   } catch (e, stack) {
     recordError('X3', e, stack);
     runApp(App(home: _StartupError(e)));

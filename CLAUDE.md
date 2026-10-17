@@ -19,7 +19,9 @@ steps in `TASKS.md`.
   (tokens in `users/{uid}/tokens/{token}`, the 3.x shape the notifier reads),
   `auth.dart` (also writes the 3.x profile fields), `export.dart` (lists and
   items), `diagnostics.dart` (the nightly backup's time), `share_in.dart`
-  (text only), `tour.dart` (this app's steps), `home_widgets.dart`.
+  (text only), `tour.dart` (this app's steps), `home_widgets.dart` (plumbing
+  only; the widget is `lib/lists/widget.dart` + `HomeWidgets.kt`: flip lists,
+  cross off in the background, + adds one item and closes the app).
 - The Pi side is `notifier/` (pushes, Home Assistant sync, reports, backup).
 - Keep green: `flutter analyze`, `flutter test`, the rules tests, the
   notifier selftests. CI runs all of them.
