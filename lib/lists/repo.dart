@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -70,7 +71,7 @@ class Item {
 
   /// The aisle it's shown under: its own, else what its name suggests
   /// (items from Home Assistant come without one).
-  String get aisle => categories.contains(category) ? category! : guessAisle(name);
+  String get aisle => categories.contains(category) ? category! : aisleFor(name);
 }
 
 class MemberCard {
@@ -468,21 +469,57 @@ Stream<List<HistoryEntry>> history(TodoList l) => _db
     .handleError((_) {});
 
 /// Counts a name in the list's history, for suggestions.
-Future<void> recordHistory(TodoList l, String name, [String? category]) =>
-    _db.doc('lists/${l.id}/history/${historyKey(name)}').set({
-      'name': name.trim(),
-      'category': ?category,
-      'count': FieldValue.increment(1),
-      'last': _now,
-      'listCreatedAt': l.createdAt,
-    }, SetOptions(merge: true));
+Future<void> recordHistory(TodoList l, String name, [String? category]) {
+  learnAisles([(name, category)]);
+  return _db.doc('lists/${l.id}/history/${historyKey(name)}').set({
+    'name': name.trim(),
+    'category': ?category,
+    'count': FieldValue.increment(1),
+    'last': _now,
+    'listCreatedAt': l.createdAt,
+  }, SetOptions(merge: true));
+}
+
+const _learnedKey = 'learned-aisles';
+
+/// [learnedAisles] as this device left them; once, at start.
+Future<void> loadLearnedAisles() async {
+  try {
+    final s = (await SharedPreferences.getInstance()).getString(_learnedKey);
+    if (s == null) return;
+    for (final MapEntry(:key, :value) in (jsonDecode(s) as Map).entries) {
+      learnedAisles.putIfAbsent('$key', () => '$value');
+    }
+  } catch (_) {}
+}
+
+/// Keeps the aisles these names were given, so every list on this device
+/// reuses them, even ones a list's top-100 history no longer holds.
+void learnAisles(Iterable<(String, String?)> named) {
+  var changed = false;
+  for (final (name, c) in named) {
+    final k = historyKey(name);
+    if (c == null || c == 'Other' || !categories.contains(c) || learnedAisles[k] == c) continue;
+    learnedAisles.remove(k); // re-added last: the newest survive the cap
+    learnedAisles[k] = c;
+    changed = true;
+  }
+  if (!changed) return;
+  while (learnedAisles.length > 3000) {
+    learnedAisles.remove(learnedAisles.keys.first);
+  }
+  final s = jsonEncode(learnedAisles);
+  SharedPreferences.getInstance().then((p) => p.setString(_learnedKey, s)).catchError((_) => false);
+}
 
 /// Adds [name] the quick way: a shopping item lands in the aisle that name had
-/// before, else the one its name suggests. Returns that aisle.
+/// before (on this list, else any list here), else the one its name suggests.
+/// Returns that aisle.
 String? addQuick(TodoList l, String name, String quantity,
     {String? known, List<HistoryEntry> past = const []}) {
-  final before = past.where((h) => h.id == historyKey(name)).firstOrNull;
-  final category = l.shopping ? (known ?? before?.category ?? guessAisle(name)) : null;
+  final before = past.where((h) => h.id == historyKey(name)).firstOrNull?.category;
+  final category =
+      l.shopping ? (known ?? (before == 'Other' ? null : before) ?? aisleFor(name)) : null;
   createItem(l, {
     'name': name,
     'description': quantity,

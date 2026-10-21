@@ -90,6 +90,7 @@ class _ListScreenState extends State<ListScreen> {
         }
       });
       _historySub = _historyStream!.listen((h) {
+        learnAisles([for (final e in h) (e.name, e.category)]);
         if (mounted) setState(() => _history = h);
       });
     }
@@ -146,6 +147,16 @@ class _ListScreenState extends State<ListScreen> {
         .where((h) => h.name.toLowerCase() != typed)
         .take(8)
         .toList();
+  }
+
+  /// A likely typo in a single shopping entry: (as typed, the fixes), or null.
+  (String, List<String>)? get _typo {
+    if (_list?.shopping != true) return null;
+    final entries = splitEntries(_add.text);
+    if (entries.length != 1) return null;
+    final name = parseEntry(entries.single).name;
+    final fixes = didYouMean(name, _history.map((h) => h.name));
+    return fixes.isEmpty || !_add.text.contains(name) ? null : (name, fixes);
   }
 
   // ---- ticking, deleting, merging ----
@@ -478,6 +489,7 @@ class _ListScreenState extends State<ListScreen> {
     final groups = _groups();
     final joins = _joins;
     final suggestions = _suggestions;
+    final typo = _typo;
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -537,13 +549,27 @@ class _ListScreenState extends State<ListScreen> {
             ),
           ),
         ),
-        if (suggestions.isNotEmpty)
+        if (suggestions.isNotEmpty || typo != null)
           SizedBox(
             height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
+                if (typo case (final typed, final fixes))
+                  for (final fix in fixes)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: ActionChip(
+                      avatar: const Icon(Icons.spellcheck, size: 16),
+                      label: Text('התכוונת ל"$fix"?'),
+                      onPressed: () {
+                        final text = _add.text.replaceFirst(typed, fix);
+                        _add.value = TextEditingValue(
+                            text: text, selection: TextSelection.collapsed(offset: text.length));
+                      },
+                    ),
+                  ),
                 for (final s in suggestions)
                   Padding(
                     padding: const EdgeInsetsDirectional.only(end: 6),

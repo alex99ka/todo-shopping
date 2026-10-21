@@ -99,6 +99,56 @@ void main() {
     expect(guessAisle('משהו אחר'), 'Other');
   });
 
+  test('aisle guesses see through prefixes, plurals and one typo', () {
+    expect(guessAisle('ועגבניות'), 'Fruits & Vegetables');
+    expect(guessAisle('הלחם'), 'Bakery');
+    expect(guessAisle('עגבניה'), 'Fruits & Vegetables');
+    expect(guessAisle('תפוחי עץ'), 'Fruits & Vegetables');
+    expect(guessAisle('מיצים'), 'Drinks');
+    expect(guessAisle('גבינות'), 'Dairy & Eggs');
+    expect(guessAisle('מלפפנים'), 'Fruits & Vegetables');
+    expect(guessAisle('שמפוו'), 'Household');
+    expect(guessAisle('חלבה'), 'Pantry');
+    expect(guessAisle('מלפפונים חמוצים'), 'Pantry');
+    expect(guessAisle('חלב שקדים'), 'Drinks');
+    // Short words need an exact match: "חלה" is not a typo of "חלב".
+    expect(guessAisle('חלה'), 'Bakery');
+    expect(guessAisle('אבג'), 'Other');
+  });
+
+  test('a name given an aisle before keeps it', () {
+    learnedAisles[historyKey('במבה נוגט')] = 'Frozen';
+    expect(aisleFor(' במבה  נוגט'), 'Frozen');
+    expect(aisleFor('במבה'), 'Pantry');
+    learnedAisles.clear();
+  });
+
+  test('typos are offered a fix, right words are not', () {
+    expect(oneSlip('חלוב', 'חלב'), isTrue);
+    expect(oneSlip('עגבנויות', 'עגבניות'), isTrue);
+    expect(oneSlip('מלפפון', 'מלפפון'), isFalse);
+    expect(oneSlip('חלה', 'חלב'), isFalse);
+    expect(oneSlip('מלפפון', 'מלפפונים'), isFalse);
+    expect(didYouMean('חלוב', []), containsAll(['חלב', 'חלות']));
+    expect(didYouMean('ממרח פיסתוקים', ['ממרח פיסטוקים']), ['ממרח פיסטוקים']);
+    expect(didYouMean('קורנפלקסס דבש', []), ['קורנפלקס דבש']);
+    expect(didYouMean('דבש קורנפלקסס', []), ['דבש קורנפלקס']);
+    expect(didYouMean('עגבניות', []), isEmpty);
+    expect(didYouMean('ועגבניות שרי', ['עגבניות שרי']), ['עגבניות שרי']);
+    expect(didYouMean('ועגבניות', []), isEmpty);
+    // A word nobody knows (a brand) is left alone.
+    expect(didYouMean('גבינה צהובבבב', []), isEmpty);
+    expect(didYouMean('xyzzy', []), isEmpty);
+  });
+
+  test('close words keep their own aisles', () {
+    expect(guessAisle('שמנת'), 'Dairy & Eggs');
+    expect(guessAisle('שמן'), 'Pantry');
+    expect(guessAisle('שוקו'), 'Dairy & Eggs');
+    expect(guessAisle('אבקת אפייה'), 'Pantry');
+    expect(guessAisle('אבקת כביסה'), 'Household');
+  });
+
   test('deadline words', () {
     final now = DateTime(2026, 10, 5, 9);
     expect(dueText(DateTime(2026, 10, 5).millisecondsSinceEpoch, now), 'היום');

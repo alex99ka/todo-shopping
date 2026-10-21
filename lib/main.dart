@@ -21,6 +21,7 @@ import 'core/update.dart';
 import 'core/web_update.dart';
 import 'firebase_options.dart';
 import 'lists/links.dart';
+import 'lists/repo.dart' show loadLearnedAisles;
 import 'lists/widget.dart';
 import 'ui/common.dart';
 import 'ui/gates.dart';
@@ -32,6 +33,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   listenForLinks();
   listenForShares();
+  loadLearnedAisles();
   // Errors nobody caught are kept for the problem report in Settings.
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
