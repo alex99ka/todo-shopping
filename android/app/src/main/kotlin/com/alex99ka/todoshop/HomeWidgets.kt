@@ -6,7 +6,15 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Typeface
 import android.net.Uri
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
+import android.text.style.StrikethroughSpan
+import android.text.style.StyleSpan
 import android.view.View
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetBackgroundIntent
@@ -22,14 +30,22 @@ import org.json.JSONObject
 // The app writes "lists" (lib/lists/widget.dart) whenever it runs, and its
 // background callback after every tap here, so the data stays fresh.
 
-private const val ROWS = 8
+private const val ROWS = 10 // row0..row9 in widget_summary.xml
+private const val ROW_DP = 52 // WidgetRow's height
+private const val CHROME_DP = 100 // padding, the title bar and the footer
+private const val TICK_MS = 500L // a crossed-off item shows its ✓ this long
 private const val FLIP = "com.alex99ka.todoshop.widget.FLIP"
 private const val CHECK = "com.alex99ka.todoshop.widget.CHECK"
 private const val CURRENT = "widget_current"
 
 class SummaryWidget : HomeWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray, data: SharedPreferences) {
-        for (id in ids) manager.updateAppWidget(id, render(context, data))
+        for (id in ids) manager.updateAppWidget(id, render(context, data, rowsFor(manager, id)))
+    }
+
+    // Resized: as many rows as now fit.
+    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) {
+        manager.updateAppWidget(id, render(context, HomeWidgetPlugin.getData(context), rowsFor(manager, id)))
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -47,19 +63,19 @@ class SummaryWidget : HomeWidgetProvider() {
             CHECK -> {
                 val list = intent.getStringExtra("list") ?: return
                 val item = intent.getStringExtra("item") ?: return
-                // At once on the widget; the app's background code writes it to Firestore.
-                val lists = lists(data)
-                for (l in 0 until lists.length()) {
-                    val o = lists.getJSONObject(l)
-                    if (o.getString("id") != list) continue
-                    val items = o.optJSONArray("items") ?: JSONArray()
-                    val kept = JSONArray()
-                    for (k in 0 until items.length()) if (items.getJSONObject(k).getString("id") != item) kept.put(items.get(k))
-                    o.put("items", kept)
-                }
-                data.edit().putString("lists", JSONObject().put("lists", lists).toString()).apply()
-                redraw(context, data)
+                // The app's background code writes it to Firestore; the widget
+                // shows a ✓ at once, and drops the row half a second later.
                 ask(context, "todoshopping://check?list=${Uri.encode(list)}&item=${Uri.encode(item)}")
+                redraw(context, data, ticked = item)
+                val pending = goAsync()
+                Handler(Looper.getMainLooper()).postDelayed({
+                    try {
+                        drop(data, list, item)
+                        redraw(context, data)
+                    } finally {
+                        pending.finish()
+                    }
+                }, TICK_MS)
             }
             else -> super.onReceive(context, intent)
         }
@@ -68,10 +84,29 @@ class SummaryWidget : HomeWidgetProvider() {
     private fun ask(context: Context, uri: String) =
         HomeWidgetBackgroundIntent.getBroadcast(context, Uri.parse(uri)).send()
 
-    private fun redraw(context: Context, data: SharedPreferences) {
+    private fun drop(data: SharedPreferences, list: String, item: String) {
+        val lists = lists(data)
+        for (l in 0 until lists.length()) {
+            val o = lists.getJSONObject(l)
+            if (o.getString("id") != list) continue
+            val items = o.optJSONArray("items") ?: JSONArray()
+            val kept = JSONArray()
+            for (k in 0 until items.length()) if (items.getJSONObject(k).getString("id") != item) kept.put(items.get(k))
+            o.put("items", kept)
+        }
+        data.edit().putString("lists", JSONObject().put("lists", lists).toString()).apply()
+    }
+
+    private fun redraw(context: Context, data: SharedPreferences, ticked: String? = null) {
         val manager = AppWidgetManager.getInstance(context)
         val ids = manager.getAppWidgetIds(ComponentName(context, SummaryWidget::class.java))
-        for (id in ids) manager.updateAppWidget(id, render(context, data))
+        for (id in ids) manager.updateAppWidget(id, render(context, data, rowsFor(manager, id), ticked))
+    }
+
+    // Portrait height (launchers report it as the max); 4 rows when unknown.
+    private fun rowsFor(manager: AppWidgetManager, id: Int): Int {
+        val h = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
+        return if (h <= 0) 4 else ((h - CHROME_DP) / ROW_DP).coerceIn(1, ROWS)
     }
 
     private fun lists(data: SharedPreferences): JSONArray =
@@ -91,7 +126,7 @@ class SummaryWidget : HomeWidgetProvider() {
     private fun open(context: Context, uri: String) =
         HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java, Uri.parse(uri))
 
-    private fun render(context: Context, data: SharedPreferences): RemoteViews {
+    private fun render(context: Context, data: SharedPreferences, rows: Int, ticked: String? = null): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_summary)
         val lists = lists(data)
         if (lists.length() == 0) {
@@ -116,11 +151,12 @@ class SummaryWidget : HomeWidgetProvider() {
         views.setViewVisibility(R.id.next, if (multi) View.VISIBLE else View.INVISIBLE)
         for (r in 0 until ROWS) {
             val v = row(context, r)
-            if (r < items.length()) {
+            if (r < rows && r < items.length()) {
                 val item = items.getJSONObject(r)
                 val itemId = item.getString("id")
                 val note = item.optString("note")
-                views.setTextViewText(v, "○  " + item.optString("name") + if (note.isNotEmpty()) "  ·  $note" else "")
+                val text = item.optString("name") + if (note.isNotEmpty()) "  ·  $note" else ""
+                views.setTextViewText(v, if (itemId == ticked) tickedText(text) else "○  $text")
                 views.setViewVisibility(v, View.VISIBLE)
                 views.setOnClickPendingIntent(v, self(context, CHECK, 100 + r) {
                     putExtra("list", id)
@@ -132,13 +168,23 @@ class SummaryWidget : HomeWidgetProvider() {
             }
         }
         val footer = when {
-            items.length() > ROWS -> "ועוד ${items.length() - ROWS}"
+            items.length() > rows -> "ועוד ${items.length() - rows}"
             items.length() == 0 -> if (shopping) "הכול בסל" else "אין משימות פתוחות"
             else -> ""
         }
         views.setTextViewText(R.id.footer, footer)
         views.setViewVisibility(R.id.footer, if (footer.isEmpty()) View.GONE else View.VISIBLE)
         return views
+    }
+
+    // "✓  name" in brown, the name struck through and greyed.
+    private fun tickedText(text: String): CharSequence {
+        val s = SpannableString("✓  $text")
+        s.setSpan(ForegroundColorSpan(0xFF8F6A48.toInt()), 0, 1, 0)
+        s.setSpan(StyleSpan(Typeface.BOLD), 0, 1, 0)
+        s.setSpan(StrikethroughSpan(), 3, s.length, 0)
+        s.setSpan(ForegroundColorSpan(0xFF6E6157.toInt()), 3, s.length, 0)
+        return s
     }
 
     private fun row(context: Context, r: Int) =
