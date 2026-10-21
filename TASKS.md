@@ -20,10 +20,6 @@ Scripts in `docs/setup/`. In a PowerShell window paste the line without the `!`;
    2026-10-21). To grow the aisle words from your real lists (read-only):
    `! powershell -File docs/setup/aisle-misses.ps1` and show Claude `%TEMP%\aisle-misses.txt`.
 
-5. At home: put your account (alex99ka) on the early-user list, then fully close and reopen the app;
-   the "גרסאות בטא" switch appears in Settings › עדכונים:
-   `! powershell -File docs/setup/early-user.ps1 alex99ka@gmail.com`
-
 ## אצל Claude
 
 - [x] Phase 0: nightly encrypted Drive backup (03:45, restore checked), notifier selftests in CI
