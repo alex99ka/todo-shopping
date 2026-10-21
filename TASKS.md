@@ -16,6 +16,10 @@ Scripts in `docs/setup/`. In a PowerShell window paste the line without the `!`;
 3. Shared friends: 4.1.0 is everyone's (promoted 2026-10-17). Left: paste
    `docs/recipe-friends-handoff.md` into the recipe book's session, so recipe friends show up here.
 
+4. 4.2.0 (better aisles, "did you mean" chips, the beta switch) is a prerelease: yours only.
+   Try it, then say "promote 4.2.0". To grow the aisle words from your real lists (read-only):
+   `! powershell -File docs/setup/aisle-misses.ps1` and show Claude `%TEMP%\aisle-misses.txt`.
+
 ## אצל Claude
 
 - [x] Phase 0: nightly encrypted Drive backup (03:45, restore checked), notifier selftests in CI
