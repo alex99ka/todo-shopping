@@ -18,6 +18,8 @@ import '../core/settings_store.dart';
 import '../core/tour.dart';
 import '../core/update.dart';
 import '../core/web_update.dart';
+import '../lists/repo.dart' show myName, setMyName;
+import 'common.dart' show askText;
 import 'skeleton.dart';
 
 /// The standard set, in this order: updates, sign-in and security, look,
@@ -83,6 +85,20 @@ class _SettingsPageState extends State<SettingsPage> {
       _say('הדיווח נשלח. תודה!');
     } catch (e) {
       showError(_messenger, e, 'שליחת הדיווח נכשלה');
+    }
+  }
+
+  /// The name friends see, here and in the recipe book; empty = the Google name.
+  Future<void> _myName() async {
+    final google = FirebaseAuth.instance.currentUser?.displayName ?? '';
+    final name = await askText(context, 'השם שלי',
+        initial: myName.value.isEmpty ? google : myName.value,
+        hint: 'ריק = השם מחשבון Google', allowEmpty: true, maxLength: 40);
+    if (name == null || !mounted) return;
+    try {
+      await setMyName(name == google ? '' : name);
+    } catch (e) {
+      showError(_messenger, e, 'השם לא נשמר');
     }
   }
 
@@ -289,6 +305,16 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
 
         _Section('חשבון'),
+        ValueListenableBuilder(
+          valueListenable: myName,
+          builder: (context, mine, _) => ListTile(
+            leading: const Icon(Icons.badge_outlined),
+            title: const Text('השם שלי'),
+            subtitle: Text('${mine.isEmpty ? user?.displayName ?? '' : mine} · כך חברים רואים אותך, '
+                'גם בספר המתכונים'),
+            onTap: _myName,
+          ),
+        ),
         ListTile(
           leading: const Icon(Icons.account_circle_outlined),
           title: Text(user?.displayName ?? ''),

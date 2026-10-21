@@ -55,9 +55,10 @@ Future<bool> confirm(BuildContext context, String title, String body, String yes
   return ok == true;
 }
 
-/// One text field in a dialog; null when cancelled or left empty.
+/// One text field in a dialog; null when cancelled, or left empty unless
+/// [allowEmpty] (a name cleared on purpose: '' = back to the default).
 Future<String?> askText(BuildContext context, String title,
-    {String initial = '', String hint = '', String yes = 'שמירה'}) async {
+    {String initial = '', String hint = '', String yes = 'שמירה', bool allowEmpty = false, int maxLength = 100}) async {
   final c = TextEditingController(text: initial);
   final v = await showDialog<String>(
     context: context,
@@ -66,7 +67,7 @@ Future<String?> askText(BuildContext context, String title,
       content: TextField(
         controller: c,
         autofocus: true,
-        maxLength: 100,
+        maxLength: maxLength,
         decoration: InputDecoration(hintText: hint),
         onSubmitted: (v) => Navigator.pop(ctx, v),
       ),
@@ -77,7 +78,7 @@ Future<String?> askText(BuildContext context, String title,
     ),
   );
   final t = v?.trim();
-  return t == null || t.isEmpty ? null : t;
+  return t == null || t.isEmpty && !allowEmpty ? null : t;
 }
 
 class Choice<T> {

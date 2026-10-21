@@ -54,8 +54,22 @@ class HouseholdsScreen extends StatelessWidget {
     }
   }
 
+  /// A name for them only you see ("אמא"), here and in the recipe book;
+  /// empty = the name they chose.
+  Future<void> _alias(BuildContext context, Friend f) async {
+    final old = aliases.value[f.uid] ?? '';
+    final alias = await askText(context, 'כינוי ל${chosenName(f.uid, f.name)}',
+        initial: old, hint: 'רק אתם רואים אותו. ריק = השם שבחרו', allowEmpty: true, maxLength: 40);
+    if (alias == null || alias == old) return;
+    try {
+      await setAlias(f.uid, alias);
+    } catch (e) {
+      fail(e, 'הכינוי לא נשמר');
+    }
+  }
+
   Future<void> _unfriend(BuildContext context, Friend f) async {
-    if (!await confirm(context, 'להסיר את ${f.name}?',
+    if (!await confirm(context, 'להסיר את ${nameOf(f.uid, f.name)}?',
         'גם בספר המתכונים. הרשימות המשותפות נשארות, עד שמישהו עוזב אותן.', 'הסרה')) {
       return;
     }
@@ -80,7 +94,7 @@ class HouseholdsScreen extends StatelessWidget {
       body: StreamBuilder<List<Friend>>(
         stream: friends(),
         builder: (context, snap) => ListenableBuilder(
-          listenable: Lists.instance,
+          listenable: Listenable.merge([Lists.instance, shownNames]),
           builder: (context, _) {
           final houses = Lists.instance.households;
           final people = snap.data ?? const <Friend>[];
@@ -120,15 +134,23 @@ class HouseholdsScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 'אותם חברים כמו בספר המתכונים. כל מי שבמשק בית שלך חבר אוטומטית, ומי שמצטרף '
-                'לרשימה דרך קישור שלך נהיה חבר. אפשר להוסיף חברים לרשימה בלי קישור.',
+                'לרשימה דרך קישור שלך נהיה חבר. אפשר להוסיף חברים לרשימה בלי קישור. '
+                'לחיצה על חבר נותנת לו כינוי שרק אתם רואים, כאן ובספר המתכונים.',
                 style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
               ),
             ),
             for (final f in people)
               ListTile(
                 leading: Icon(f.mate ? Icons.home_outlined : Icons.person_outline),
-                title: Text(f.name.isEmpty ? 'ללא שם' : f.name),
-                subtitle: f.mate ? const Text('ממשק הבית') : null,
+                title: Text(nameOf(f.uid, f.name).isEmpty ? 'ללא שם' : nameOf(f.uid, f.name)),
+                // With an alias, the name they chose too, so it's clear who it is.
+                subtitle: f.mate || aliases.value.containsKey(f.uid)
+                    ? Text([
+                        if (aliases.value.containsKey(f.uid)) chosenName(f.uid, f.name),
+                        if (f.mate) 'ממשק הבית',
+                      ].join(' · '))
+                    : null,
+                onTap: () => _alias(context, f),
                 trailing: f.mate
                     ? null
                     : IconButton(

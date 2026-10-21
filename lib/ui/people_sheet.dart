@@ -84,7 +84,7 @@ class _PeopleSheetState extends State<_PeopleSheet> {
                     () =>
                         v == true ? _picked.add(f.uid) : _picked.remove(f.uid),
                   ),
-                  title: Text(f.name.isEmpty ? 'ללא שם' : f.name),
+                  title: Text(nameOf(f.uid, f.name).isEmpty ? 'ללא שם' : nameOf(f.uid, f.name)),
                   subtitle: f.mate ? const Text('ממשק הבית') : null,
                   secondary: Icon(
                     f.mate ? Icons.home_outlined : Icons.person_outline,

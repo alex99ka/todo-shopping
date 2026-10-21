@@ -446,7 +446,9 @@ Stream<Map<String, MemberCard>> members(TodoList l) => _db
 /// Your name and photo on this list, so housemates see who did what.
 Future<void> saveMemberCard(TodoList l) {
   final u = FirebaseAuth.instance.currentUser!;
-  final name = (u.displayName?.isNotEmpty ?? false) ? u.displayName! : '${u.email}'.split('@').first;
+  final name = myName.value.isNotEmpty
+      ? myName.value
+      : (u.displayName?.isNotEmpty ?? false) ? u.displayName! : '${u.email}'.split('@').first;
   return _db.doc('lists/${l.id}/members/${u.uid}').set({
     'name': name.length > 60 ? name.substring(0, 60) : name,
     'photo': (u.photoURL ?? '').length > 500 ? '' : (u.photoURL ?? ''),
@@ -635,3 +637,68 @@ Future<void> befriendInviter(String inviteId) =>
     server('POST', '/friends/from-invite', {'inviteId': inviteId}, recipeApi).then((_) {}, onError: (_) {});
 
 Future<void> unfriend(String friendUid) => server('DELETE', '/friends/$friendUid', null, recipeApi);
+
+// ---- names: the recipe book's, so both apps show the same ----
+
+/// The name you chose for friends to see ('' = your Google name).
+final myName = ValueNotifier('');
+
+/// How each friend or housemate shows to you: your alias for them, else the
+/// name they chose; and the aliases alone. Kept on the device for offline.
+final shownNames = ValueNotifier<Map<String, String>>({});
+final aliases = ValueNotifier<Map<String, String>>({});
+
+String get _namesKey => 'names-$uid';
+
+/// [fallback] (a Google name from Firestore) unless the recipe book knows better.
+String nameOf(String uid, String fallback) {
+  final n = shownNames.value[uid];
+  return n == null || n.isEmpty ? fallback : n;
+}
+
+/// From the device at once, then from the recipe server. Best effort.
+Future<void> loadNames() async {
+  _setNames(const {});
+  try {
+    final s = (await SharedPreferences.getInstance()).getString(_namesKey);
+    if (s != null) _setNames(jsonDecode(s) as Map<String, dynamic>);
+  } catch (_) {}
+  try {
+    final me = await server('GET', '/me', null, recipeApi) as Map<String, dynamic>;
+    final people = await server('GET', '/friends?mates=1', null, recipeApi) as List;
+    final j = {'me': me['displayName'] ?? '', 'people': people};
+    _setNames(j);
+    (await SharedPreferences.getInstance()).setString(_namesKey, jsonEncode(j)).ignore();
+  } catch (_) {}
+}
+
+void _setNames(Map<String, dynamic> j) {
+  myName.value = '${j['me'] ?? ''}';
+  final people = [for (final p in (j['people'] as List? ?? const [])) (p as Map).cast<String, dynamic>()];
+  shownNames.value = {for (final p in people) '${p['uid']}': '${p['name'] ?? ''}'};
+  _chosen = {for (final p in people) '${p['uid']}': '${p['chosen'] ?? p['name'] ?? ''}'};
+  aliases.value = {
+    for (final p in people)
+      if ('${p['alias'] ?? ''}'.isNotEmpty) '${p['uid']}': '${p['alias']}',
+  };
+}
+
+var _chosen = <String, String>{};
+
+/// The name [friendUid] chose for themselves, whatever your alias for them.
+String chosenName(String friendUid, String fallback) {
+  final n = _chosen[friendUid];
+  return n == null || n.isEmpty ? fallback : n;
+}
+
+/// A name for a friend only you see, in both apps; '' takes it away.
+Future<void> setAlias(String friendUid, String alias) async {
+  await server('PUT', '/friends/$friendUid/alias', {'alias': alias}, recipeApi);
+  await loadNames();
+}
+
+/// The name friends see, in both apps; '' goes back to the Google name.
+Future<void> setMyName(String name) async {
+  await server('PATCH', '/me', {'displayName': name}, recipeApi);
+  await loadNames();
+}

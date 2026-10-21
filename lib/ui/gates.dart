@@ -61,6 +61,8 @@ class _AccessGateState extends State<_AccessGate> {
   late final Future<bool> _allowed = _check();
 
   Future<bool> _check() async {
+    // Friends' names and aliases, from the recipe book (kept on the device too).
+    loadNames().ignore();
     try {
       final ok = await RemoteConfig.instance.checkAccess(widget.email);
       await rememberAccess(ok);

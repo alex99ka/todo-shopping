@@ -185,7 +185,7 @@ class _ItemSheetState extends State<_ItemSheet> {
                 decoration: const InputDecoration(labelText: 'באחריות', border: OutlineInputBorder()),
                 items: [
                   const DropdownMenuItem(value: '', child: Text('כל אחד')),
-                  for (final m in widget.members) DropdownMenuItem(value: m.uid, child: Text(m.name)),
+                  for (final m in widget.members) DropdownMenuItem(value: m.uid, child: Text(nameOf(m.uid, m.name))),
                 ],
                 onChanged: (v) => setState(() => _assignee = v ?? ''),
               ),

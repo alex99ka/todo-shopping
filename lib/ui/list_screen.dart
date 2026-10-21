@@ -455,7 +455,7 @@ class _ListScreenState extends State<ListScreen> {
     if (id == null) return '';
     if (id == uid) return 'אני';
     if (id == 'home-assistant') return 'Home Assistant';
-    return _members[id]?.name ?? '';
+    return nameOf(id, _members[id]?.name ?? '');
   }
 
   /// "Bought by", "for" or "added by", only on lists more than one person uses.
@@ -781,7 +781,7 @@ class _ListScreenState extends State<ListScreen> {
           CircleAvatar(
             radius: 14,
             foregroundImage: avatar.photo.isEmpty ? null : NetworkImage(avatar.photo),
-            child: Text(avatar.name.isEmpty ? '?' : avatar.name.characters.first, style: const TextStyle(fontSize: 12)),
+            child: Text(nameOf(avatar.uid, avatar.name).characters.firstOrNull ?? '?', style: const TextStyle(fontSize: 12)),
           ),
         if (l.shopping)
           IconButton(tooltip: 'עריכת ${i.name}', icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(i)),
@@ -936,6 +936,8 @@ class _PickListsState extends State<_PickLists> {
 /// The signed-in user's name and photo, as the member card holds them.
 (String, String) authUser() {
   final u = FirebaseAuth.instance.currentUser;
-  final name = (u?.displayName?.isNotEmpty ?? false) ? u!.displayName! : '${u?.email}'.split('@').first;
+  final name = myName.value.isNotEmpty
+      ? myName.value
+      : (u?.displayName?.isNotEmpty ?? false) ? u!.displayName! : '${u?.email}'.split('@').first;
   return (name.length > 60 ? name.substring(0, 60) : name, u?.photoURL ?? '');
 }

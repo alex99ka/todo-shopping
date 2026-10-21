@@ -11,7 +11,7 @@ bool get hasServer => AppConfig.serverUrl.isNotEmpty;
 /// Calls the home server with the signed-in user's Firebase ID token, which
 /// the server checks on every route ([base]: another server of Alex's that
 /// takes this project's tokens, like the recipe book's). Every call has a timeout.
-Future<Map<String, dynamic>> server(
+Future<dynamic> server(
   String method,
   String path, [
   Map<String, dynamic>? body,
@@ -27,5 +27,5 @@ Future<Map<String, dynamic>> server(
   if (res.statusCode >= 400) {
     throw ServerException(res.statusCode, res.body);
   }
-  return res.body.isEmpty ? {} : jsonDecode(res.body) as Map<String, dynamic>;
+  return res.body.isEmpty ? {} : jsonDecode(res.body);
 }
