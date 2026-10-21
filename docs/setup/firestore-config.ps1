@@ -5,7 +5,7 @@ $h = @{ Authorization = "Bearer $(gcloud.cmd auth print-access-token)"; 'x-goog-
 $base = 'https://firestore.googleapis.com/v1/projects/alex-todo-shopping/databases/(default)/documents'
 
 $app = @{ fields = @{ minVersion = @{ stringValue = '0.0.0' }; message = @{ stringValue = '' } } }
-$access = @{ fields = @{ earlyUsers = @{ arrayValue = @{ values = @(@{ stringValue = 'alex98ka@gmail.com' }) } } } }
+$access = @{ fields = @{ earlyUsers = @{ arrayValue = @{ values = @(@{ stringValue = 'alex99ka@gmail.com' }, @{ stringValue = 'alex98ka@gmail.com' }) } } } }
 
 Invoke-RestMethod "$base/config/app" -Method Patch -Headers $h -ContentType 'application/json' -Body ($app | ConvertTo-Json -Depth 8) | Out-Null
 Invoke-RestMethod "$base/config/access" -Method Patch -Headers $h -ContentType 'application/json' -Body ($access | ConvertTo-Json -Depth 8) | Out-Null
