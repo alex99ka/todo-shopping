@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/app_info.dart';
 import '../core/auth.dart';
 import '../core/remote_config.dart';
+import '../core/settings_store.dart';
 import '../core/update.dart';
 import '../core/web_update.dart';
 import '../lists/repo.dart';
@@ -63,7 +64,8 @@ class _AccessGateState extends State<_AccessGate> {
     try {
       final ok = await RemoteConfig.instance.checkAccess(widget.email);
       await rememberAccess(ok);
-      AppUpdater.instance?.early = RemoteConfig.instance.earlyUser;
+      AppUpdater.instance?.early =
+          RemoteConfig.instance.earlyUser && SettingsStore.instance.beta;
       return ok;
     } catch (_) {
       // Offline: whoever was let in before stays in.

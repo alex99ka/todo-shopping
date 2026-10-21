@@ -66,6 +66,12 @@ void main() {
       expect(pickRelease(releases, early: true)!['tag_name'], '1.3.0');
     });
 
+    test('the running version shows as a beta only while it is a prerelease', () {
+      expect(isPrerelease(releases, '1.3.0'), isTrue);
+      expect(isPrerelease(releases, '1.2.0'), isFalse);
+      expect(isPrerelease(releases, '0.9.0'), isNull);
+    });
+
     test('drafts are never offered', () {
       expect(pickRelease([rel('9.0.0', draft: true)], early: true), isNull);
     });

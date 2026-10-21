@@ -56,6 +56,17 @@ Map<String, dynamic>? pickRelease(List<dynamic> releases, {required bool early})
   return best;
 }
 
+/// Whether [version] is published as a prerelease (a beta): null when it
+/// isn't in the list at all (a local build, or an old version).
+bool? isPrerelease(List<dynamic> releases, String version) {
+  for (final r in releases.cast<Map<String, dynamic>>()) {
+    if ('${r['tag_name']}'.replaceFirst(RegExp(r'^v'), '') == version) {
+      return r['prerelease'] == true;
+    }
+  }
+  return null;
+}
+
 /// sha256 for [asset] from a SHA256SUMS text (`<hex>  <name>` per line).
 String? digestFromSums(String sums, String asset) {
   for (final line in const LineSplitter().convert(sums)) {
@@ -67,10 +78,16 @@ String? digestFromSums(String sums, String asset) {
 
 abstract interface class UpdateSource {
   Future<Release?> latest(String platform, {required bool early});
+
+  /// From the last [latest]: whether the running version is a beta.
+  bool? get runningBeta;
 }
 
 class GitHubUpdateSource implements UpdateSource {
   static const _limit = Duration(seconds: 30);
+
+  @override
+  bool? runningBeta;
 
   Future<String> _get(String url) async {
     final res = await http.get(Uri.parse(url), headers: {
@@ -84,7 +101,8 @@ class GitHubUpdateSource implements UpdateSource {
   Future<Release?> latest(String platform, {required bool early}) async {
     final list = jsonDecode(await _get(
         'https://api.github.com/repos/${AppConfig.githubRepo}/releases?per_page=10'));
-    final r = pickRelease(list as List, early: early);
+    runningBeta = isPrerelease(list as List, AppInfo.version);
+    final r = pickRelease(list, early: early);
     if (r == null) return null;
     final assets = (r['assets'] as List).cast<Map<String, dynamic>>();
     final asset =
@@ -235,8 +253,18 @@ class AppUpdater extends ChangeNotifier {
     _ => null,
   };
 
-  /// Set by the shell from RemoteConfig.earlyUser.
-  bool early = false;
+  /// Gets prereleases: an early user (RemoteConfig.earlyUser) who kept the
+  /// beta switch on. A change checks at once, not 6 hours later: the launch
+  /// check runs before the server has said who this is.
+  bool get early => _early;
+  bool _early = false;
+  set early(bool v) {
+    if (v == _early) return;
+    _early = v;
+    check();
+  }
+
+  bool? get runningBeta => source.runningBeta;
 
   Release? available;
   bool checking = false;

@@ -8,11 +8,24 @@ class SettingsStore extends ChangeNotifier {
 
   ThemeMode themeMode = ThemeMode.system;
 
+  /// Early users only: install prereleases. On until they turn it off.
+  bool beta = true;
+
   Future<void> load() async {
     try {
-      final v = (await SharedPreferences.getInstance()).getString('theme');
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getString('theme');
       themeMode = ThemeMode.values.firstWhere((m) => m.name == v,
           orElse: () => ThemeMode.system);
+      beta = prefs.getBool('beta') ?? true;
+    } catch (_) {}
+  }
+
+  Future<void> setBeta(bool on) async {
+    beta = on;
+    notifyListeners();
+    try {
+      await (await SharedPreferences.getInstance()).setBool('beta', on);
     } catch (_) {}
   }
 

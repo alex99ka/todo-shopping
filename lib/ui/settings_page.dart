@@ -12,6 +12,7 @@ import '../core/export.dart';
 import '../core/home_widgets.dart';
 import '../core/lock.dart';
 import '../core/notifications.dart';
+import '../core/remote_config.dart';
 import '../core/report.dart';
 import '../core/settings_store.dart';
 import '../core/tour.dart';
@@ -111,7 +112,9 @@ class _SettingsPageState extends State<SettingsPage> {
             listenable: Listenable.merge([updater, WebUpdate.instance]),
             builder: (context, _) => ListTile(
               leading: const Icon(Icons.system_update),
-              title: Text('גרסה ${AppInfo.versionLabel}'),
+              // Only early users see whether this is a beta.
+              title: Text('גרסה ${AppInfo.versionLabel}'
+                  '${RemoteConfig.instance.earlyUser && updater?.runningBeta == true ? ' · בטא' : ''}'),
               subtitle: Text(updater == null
                   ? (WebUpdate.instance.available != null
                       ? 'גרסה ${WebUpdate.instance.available} זמינה: רענון'
@@ -139,6 +142,20 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ),
+        if (updater != null && RemoteConfig.instance.earlyUser)
+          ListenableBuilder(
+            listenable: SettingsStore.instance,
+            builder: (context, _) => SwitchListTile(
+              secondary: const Icon(Icons.science_outlined),
+              title: const Text('גרסאות בטא'),
+              subtitle: const Text('מקבלים כל גרסה ראשונים, לפני שהיא עוברת לכולם. רק אצלך'),
+              value: SettingsStore.instance.beta,
+              onChanged: (on) {
+                SettingsStore.instance.setBeta(on);
+                updater.early = on;
+              },
+            ),
+          ),
         ListTile(
           leading: const Icon(Icons.new_releases_outlined),
           title: const Text('מה חדש בגרסה הזו'),
