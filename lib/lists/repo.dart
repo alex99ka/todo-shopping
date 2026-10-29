@@ -132,6 +132,20 @@ class Lists extends ChangeNotifier {
   TodoList? byId(String id) => _direct[id] ?? {for (final g in _viaHouse.values) ...g}[id];
   List<Item>? itemsOf(String listId) => _items[listId];
 
+  /// [items]' copies on the other shopping lists ([twinOf]): an item on the
+  /// grocer's list and the Asian market's is bought once.
+  Map<String, List<Item>> twins(String listId, List<Item> items) {
+    if (byId(listId)?.shopping != true) return {};
+    return {
+      for (final l in all)
+        if (l.id != listId && l.shopping)
+          l.id: [
+            for (final o in itemsOf(l.id) ?? const <Item>[])
+              if (items.any((i) => twinOf(i.d, o.d))) o
+          ],
+    }..removeWhere((_, v) => v.isEmpty);
+  }
+
   /// Once per signed-in account; signing out (or in as someone else) resets.
   void start() {
     if (_for == uid) return;
@@ -384,10 +398,10 @@ Future<void> createItem(TodoList list, Map<String, Object?> fields, [String? id]
 Future<void> updateItem(String listId, String itemId, Map<String, Object?> changes) =>
     _item(listId, itemId).update(changes);
 
-Future<void> setDone(String listId, List<Item> items, bool done) {
+Future<void> setDone(String listId, List<Item> items, bool done, [int? now]) {
   final b = _db.batch();
   for (final i in items) {
-    b.update(_item(listId, i.id), tickChanges(i.d, done, uid));
+    b.update(_item(listId, i.id), tickChanges(i.d, done, uid, now));
   }
   return b.commit();
 }

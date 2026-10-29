@@ -19,8 +19,8 @@ void main() {
   test('ticking a repeating task moves it instead of finishing it', () {
     final now = at('2026-10-05T09:00');
     final task = {'name': 'ארנונה', 'state': false, 'description': '', 'date': 1};
-    expect(tickChanges(task, true, 'u1', now), {'state': true, 'doneBy': 'u1'});
-    expect(tickChanges(task, false, 'u1', now), {'state': false, 'doneBy': null});
+    expect(tickChanges(task, true, 'u1', now), {'state': true, 'doneBy': 'u1', 'doneAt': now});
+    expect(tickChanges(task, false, 'u1', now), {'state': false, 'doneBy': null, 'doneAt': null});
     final repeating = {
       ...task,
       'repeat': 'monthly',
@@ -85,6 +85,28 @@ void main() {
         name: (i) => i.$1, done: (i) => i.$3, date: (i) => i.$2);
     expect(groups, [
       [(' בשר  טחון', 1, false), ('בשר טחון', 2, false)]
+    ]);
+  });
+
+  test('the same thing on another list goes along: open with open, ticked by the same tap', () {
+    final open = {'name': 'בצל', 'state': false};
+    expect(twinOf(open, {'name': 'בצלים', 'state': false}), true);
+    expect(twinOf(open, {'name': 'בצלים', 'state': true, 'doneAt': 5}), false);
+    expect(twinOf(open, {'name': 'שום', 'state': false}), false);
+    final ticked = {'name': 'בצל', 'state': true, 'doneAt': 5};
+    expect(twinOf(ticked, {'name': 'בצל', 'state': true, 'doneAt': 5}), true);
+    expect(twinOf(ticked, {'name': 'בצל', 'state': true, 'doneAt': 4}), false); // last week's
+    expect(twinOf(ticked, {'name': 'בצל', 'state': true}), false);
+    expect(twinOf(ticked, {'name': 'בצל', 'state': false}), false);
+  });
+
+  test('duplicates meet across plurals', () {
+    final items = [('בצלים', 2, false), ('בצל', 1, false), ('עגבנייה', 3, false), ('עגבניות', 4, false), ('לחם', 5, false)];
+    final groups = duplicateGroups(items,
+        name: (i) => i.$1, done: (i) => i.$3, date: (i) => i.$2);
+    expect(groups, [
+      [('בצל', 1, false), ('בצלים', 2, false)],
+      [('עגבנייה', 3, false), ('עגבניות', 4, false)],
     ]);
   });
 

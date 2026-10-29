@@ -76,8 +76,26 @@ Future<void> widgetBackground(Uri? uri) async {
     if (list != null && item != null) {
       final ref = db.doc('lists/$list/items/$item');
       final d = (await ref.get()).data();
-      // A repeating task moves to its next deadline instead of finishing.
-      if (d != null && d['state'] != true) await ref.update(tickChanges(d, true, uid));
+      if (d != null && d['state'] != true) {
+        final (lists, items, main) = await _readAll();
+        final b = db.batch();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        // A repeating task moves to its next deadline instead of finishing.
+        b.update(ref, tickChanges(d, true, uid, now));
+        items[list]?.removeWhere((i) => i.id == item);
+        // The same thing on the other shopping lists is bought with it.
+        if (lists.any((l) => l.id == list && l.shopping)) {
+          for (final l in lists.where((l) => l.id != list && l.shopping)) {
+            for (final o in [...?items[l.id]].where((o) => twinOf(d, o.d))) {
+              b.update(db.doc('lists/${l.id}/items/${o.id}'), tickChanges(o.d, true, uid, now));
+              items[l.id]!.remove(o);
+            }
+          }
+        }
+        await b.commit();
+        await pushWidgetData(widgetJson(lists, (id) => items[id], main));
+        return;
+      }
     }
   }
   await refreshWidgetFromServer();
@@ -86,6 +104,12 @@ Future<void> widgetBackground(Uri? uri) async {
 /// Everything the widget shows, read straight from Firestore (the app's live
 /// store isn't running in the background).
 Future<void> refreshWidgetFromServer() async {
+  final (lists, items, main) = await _readAll();
+  await pushWidgetData(widgetJson(lists, (id) => items[id], main));
+}
+
+/// Every list with its open items, and the main list's id.
+Future<(List<TodoList>, Map<String, List<Item>>, String?)> _readAll() async {
   final db = FirebaseFirestore.instance;
   final me = uid;
   final lists = <String, TodoList>{};
@@ -115,5 +139,5 @@ Future<void> refreshWidgetFromServer() async {
     items[l.id] = [for (final d in s.docs) Item(d.id, d.data())];
   }
   final main = (await db.doc('users/$me').get()).data()?['recipeListId'] as String?;
-  await pushWidgetData(widgetJson(lists.values.toList(), (id) => items[id], main));
+  return (lists.values.toList(), items, main);
 }

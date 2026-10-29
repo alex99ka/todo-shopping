@@ -45,6 +45,35 @@ def norm(name):
     return ' '.join((name or '').split()).lower()
 
 
+# The app's thingKey (lib/lists/logic.dart): "בצל" and "בצלים" are one thing.
+_FINALS = str.maketrans('ךםןףץ', 'כמנפצ')
+
+
+def _stem(w):
+    p = w.lower().translate(_FINALS).replace('יי', 'י')
+    for s in ('ימ', 'ות', 'ה', 'י'):
+        if len(p) >= 4 and p.endswith(s) and len(p) - len(s) >= 2:
+            return p[:-len(s)]
+    return p
+
+
+def thing_key(name):
+    return ' '.join(_stem(w) for w in (name or '').split())
+
+
+def twin_of(item, other):
+    """The app's twinOf: other goes along when item is ticked, unticked or deleted."""
+    if thing_key(other.get('name')) != thing_key(item.get('name')):
+        return False
+    if item.get('state') is not True:
+        return other.get('state') is not True
+    return other.get('state') is True and other.get('doneAt') is not None and other.get('doneAt') == item.get('doneAt')
+
+
+def is_shopping(lst):
+    return lst.get('kind') == 'shopping' if lst.get('kind') is not None else lst.get('name') == 'Shopping'
+
+
 # --- pure logic (covered by the notifier's --selftest) ---
 
 def plan(app, ha, pairs):
@@ -131,7 +160,7 @@ class Watch:
 
     def __init__(self, db, list_id):
         self.lst = db.collection('lists').document(list_id).get().to_dict()
-        self.items, self.lock, self.ready = {}, threading.Lock(), threading.Event()
+        self.items, self.docs, self.lock, self.ready = {}, {}, threading.Lock(), threading.Event()
         self.until = time.time() + WATCH_FOR_S
         self.watch = None
         if self.lst is not None:
@@ -144,20 +173,45 @@ class Watch:
             for c in changes:
                 if c.type.name == 'REMOVED':
                     self.items.pop(c.document.id, None)
+                    self.docs.pop(c.document.id, None)
                 else:
                     d = c.document.to_dict()
                     self.items[c.document.id] = ((d.get('name') or '').strip(), bool(d.get('state')))
+                    self.docs[c.document.id] = d
         self.ready.set()
 
     def snapshot(self):
         if not self.ready.wait(60):
             raise OSError('Firestore listener not ready')
         with self.lock:
-            return dict(self.items)
+            return dict(self.items), dict(self.docs)
 
     def close(self):
         if self.watch:
             self.watch.unsubscribe()
+
+
+def twins(db, list_id, lst, item):
+    """item's copies on the other shopping lists of the same household or people."""
+    if not is_shopping(lst):
+        return []
+    lists = db.collection('lists')
+    found = {}
+    if lst.get('householdId'):
+        found.update({d.id: d for d in lists.where(filter=FieldFilter('householdId', '==', lst['householdId'])).stream()})
+    members = (lst.get('memberUids') or [])[:30]
+    if members:
+        found.update({d.id: d for d in lists.where(filter=FieldFilter('memberUids', 'array_contains_any', members)).stream()})
+    refs = []
+    for other_id, d in found.items():
+        o = d.to_dict()
+        if other_id == list_id or not is_shopping(o):
+            continue
+        q = (lists.document(other_id).collection('items')
+             .where(filter=FieldFilter('listCreatedAt', '==', o.get('createdAt')))
+             .where(filter=FieldFilter('state', '==', item.get('state') is True)))
+        refs += [i.reference for i in q.stream() if twin_of(item, i.to_dict())]
+    return refs
 
 
 def sync_list(db, list_id, entity, now_ms, st):
@@ -172,7 +226,7 @@ def sync_list(db, list_id, entity, now_ms, st):
         return
     lst = w.lst
     items_ref = db.collection('lists').document(list_id).collection('items')
-    app = w.snapshot()
+    app, docs = w.snapshot()
     ha = ha_items(entity)
     state_ref = db.document(f'notifier/ha-{list_id}')
     saved = st.setdefault('ha_pairs', {})
@@ -195,9 +249,17 @@ def sync_list(db, list_id, entity, now_ms, st):
             added[item_id] = (name, done)
         elif kind == 'app_update':
             _, item_id, name, done = op
-            items_ref.document(item_id).update({'name': name, 'state': done, 'doneBy': BY if done else None})
+            change = {'state': done, 'doneBy': BY if done else None, 'doneAt': now_ms() if done else None}
+            if done == app[item_id][1]:
+                change = {}
+            items_ref.document(item_id).update({'name': name, **change})
+            # Ticked in HA: the same thing on the other shopping lists goes with it.
+            for ref in twins(db, list_id, lst, docs[item_id]) if change else []:
+                ref.update(change)
         elif kind == 'app_delete':
             items_ref.document(op[1]).delete()
+            for ref in twins(db, list_id, lst, docs[op[1]]):
+                ref.delete()
         elif kind == 'app_add':
             _, uid, name, done = op
             ref = items_ref.document()
@@ -265,6 +327,14 @@ def selftest():
     assert plan({}, {'h1': ('חלב', False)}, {'a1': p('h1', 'חלב')}) == ([('ha_remove', 'h1')], {})
     assert plan({'a1': ('חלב', False)}, {}, {'a1': p('h1', 'חלב')}) == ([('app_delete', 'a1')], {})
     assert plan({}, {}, {'a1': p('h1', 'חלב')}) == ([], {})
+
+    # The same thing on another shopping list: open with open, ticked by the same tap.
+    assert thing_key('בצלים') == thing_key(' בצל ') and thing_key('עגבנייה') == thing_key('עגבניות')
+    assert twin_of({'name': 'בצל', 'state': False}, {'name': 'בצלים', 'state': False})
+    assert not twin_of({'name': 'בצל', 'state': False}, {'name': 'שום', 'state': False})
+    assert twin_of({'name': 'בצל', 'state': True, 'doneAt': 5}, {'name': 'בצל', 'state': True, 'doneAt': 5})
+    assert not twin_of({'name': 'בצל', 'state': True, 'doneAt': 5}, {'name': 'בצל', 'state': True, 'doneAt': 4})
+    assert is_shopping({'kind': 'shopping'}) and is_shopping({'name': 'Shopping'}) and not is_shopping({'kind': 'todo'})
 
     # Nothing changed -> nothing to do.
     assert plan({'a1': ('חלב', False)}, {'h1': ('חלב', False)}, {'a1': p('h1', 'חלב')}) == (

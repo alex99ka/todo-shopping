@@ -163,8 +163,10 @@ class _ListScreenState extends State<ListScreen> {
 
   void _toggle(Item i) {
     final l = _list!;
-    final changes = tickChanges(i.d, !i.done, uid);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final changes = tickChanges(i.d, !i.done, uid, now);
     updateItem(l.id, i.id, changes).catchError((Object e) => fail(e, 'משהו השתבש'));
+    _tickTwins([i], !i.done, now);
     HapticFeedback.selectionClick();
     final due = changes['dueAt'];
     if (due is int) {
@@ -175,9 +177,21 @@ class _ListScreenState extends State<ListScreen> {
   /// Deletes at once and offers undo instead of asking first.
   void _remove(List<Item> items, String message) {
     if (items.isEmpty) return;
-    final id = widget.listId;
-    deleteItems(id, items).catchError((Object e) => fail(e, 'המחיקה נכשלה'));
-    undoable(message, () => restoreItems(id, items).catchError((Object e) => fail(e, 'השחזור נכשל')));
+    final gone = {widget.listId: items, ...Lists.instance.twins(widget.listId, items)};
+    for (final e in gone.entries) {
+      deleteItems(e.key, e.value).catchError((Object e) => fail(e, 'המחיקה נכשלה'));
+    }
+    undoable(message, () {
+      for (final e in gone.entries) {
+        restoreItems(e.key, e.value).catchError((Object e) => fail(e, 'השחזור נכשל'));
+      }
+    });
+  }
+
+  void _tickTwins(List<Item> items, bool done, int now) {
+    for (final e in Lists.instance.twins(widget.listId, items).entries) {
+      setDone(e.key, e.value, done, now).catchError((Object e) => fail(e, 'משהו השתבש'));
+    }
   }
 
   /// Shopping lines for the same thing, each with what joining would make of
@@ -301,7 +315,9 @@ class _ListScreenState extends State<ListScreen> {
           icon: Icons.delete_sweep_outlined, danger: true),
     ]);
     if (a == 'check' || a == 'uncheck') {
-      setDone(widget.listId, g.items, a == 'check').catchError((Object e) => fail(e, 'משהו השתבש'));
+      final now = DateTime.now().millisecondsSinceEpoch;
+      setDone(widget.listId, g.items, a == 'check', now).catchError((Object e) => fail(e, 'משהו השתבש'));
+      _tickTwins(g.items.where((i) => i.done != (a == 'check')).toList(), a == 'check', now);
     } else if (a == 'empty') {
       _remove(g.items, '"${g.title}" רוקנה');
     }

@@ -312,6 +312,16 @@ test('a task can repeat weekly or monthly, nothing else', async () => {
   });
 });
 
+test('doneAt, when the item was ticked, is a number or cleared', async () => {
+  await withTestEnv(async (env) => {
+    await seed(env);
+    const ref = doc(env.authenticatedContext(MEMBER).firestore(), 'lists/list-1/items/item-1');
+    await assertSucceeds(updateDoc(ref, { state: true, doneBy: MEMBER, doneAt: 1761700000000 }));
+    await assertSucceeds(updateDoc(ref, { state: false, doneBy: null, doneAt: null }));
+    await assertFails(updateDoc(ref, { doneAt: 'now' }));
+  });
+});
+
 test('doneBy can only name yourself', async () => {
   await withTestEnv(async (env) => {
     await seed(env);

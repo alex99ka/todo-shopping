@@ -47,8 +47,17 @@ Map<String, Object?> tickChanges(Map<String, dynamic> item, bool done, String? u
       },
     };
   }
-  return {'state': done, 'doneBy': done ? uid : null};
+  // doneAt: copies on other lists ticked by the same tap share it (see [twinOf]).
+  return {'state': done, 'doneBy': done ? uid : null, 'doneAt': done ? now ?? DateTime.now().millisecondsSinceEpoch : null};
 }
+
+/// Whether [other] (on another shopping list) goes along when [item] is
+/// ticked, unticked or deleted: the same thing still open, or ticked by the same tap.
+bool twinOf(Map<String, dynamic> item, Map<String, dynamic> other) =>
+    thingKey('${other['name'] ?? ''}') == thingKey('${item['name'] ?? ''}') &&
+    (item['state'] != true
+        ? other['state'] != true
+        : other['state'] == true && other['doneAt'] != null && other['doneAt'] == item['doneAt']);
 
 const _units =
     'ק"ג|ק״ג|קג|קילו|גרם|גר\'|ג\'|ליטר|ל\'|מ"ל|מ״ל|יח\'|יחידות|חבילות|חבילה|שקיות|בקבוקים|קופסאות';
@@ -159,14 +168,17 @@ String joinAmounts(List<String> texts) =>
     addAmounts(texts) ??
     texts.map((t) => t.trim()).where((t) => t.isNotEmpty).join(' + ');
 
-/// Open items that share a name, oldest first in each group.
+/// Names that mean the same thing ("בצל", "בצלים") share this.
+String thingKey(String name) => name.trim().split(RegExp(r'\s+')).map(_stem).join(' ');
+
+/// Open items that share a name ([thingKey]), oldest first in each group.
 List<List<T>> duplicateGroups<T>(List<T> items,
     {required String Function(T) name,
     required bool Function(T) done,
     required int Function(T) date}) {
   final byName = <String, List<T>>{};
   for (final i in items.where((i) => !done(i))) {
-    byName.putIfAbsent(historyKey(name(i)), () => []).add(i);
+    byName.putIfAbsent(thingKey(name(i)), () => []).add(i);
   }
   return [
     for (final g in byName.values)

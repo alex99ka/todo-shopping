@@ -159,6 +159,8 @@ class MainActivity : FlutterFragmentActivity() {
                     val launch = call.argument<String>("package")?.let {
                         packageManager.getLaunchIntentForPackage(it)
                     }
+                    // Its own task, as from the home screen, not stacked on this app's.
+                    launch?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                     if (launch != null) startActivity(launch)
                     result.success(launch != null)
                 }
