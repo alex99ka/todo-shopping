@@ -33,6 +33,9 @@ Scripts in `docs/setup/`. In a PowerShell window paste the line without the `!`;
 
 ## Closed
 
+- 2026-10-30: 4.5.0 released and promoted (web too): shopping items name the recipe they came
+  from; a line already on the list joins the new one and names the newer recipe. Rules
+  (`recipe` on items) deployed first.
 - 2026-10-17: Telegram chat id fixed (937317693); problem reports reach Telegram. 4.0.2: one
   widget (flip lists, cross off, add one).
 
