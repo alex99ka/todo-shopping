@@ -249,7 +249,7 @@ class _ListScreenState extends State<ListScreen> {
         .catchError((Object e) => fail(e, 'האיחוד נכשל'));
     undoable('"${drop.name}" אוחד עם "$name"', () {
       Future.wait([
-        updateItem(id, keep.id, {'name': keep.name, 'description': keep.description}),
+        updateItem(id, keep.id, {'name': keep.name, 'description': keep.description, 'recipe': keep.recipe}),
         restoreItems(id, [drop]),
       ]).catchError((Object e) {
         fail(e, 'השחזור נכשל');
@@ -781,10 +781,12 @@ class _ListScreenState extends State<ListScreen> {
                   : null),
         ),
       ]),
-      subtitle: i.description.isEmpty && who.isEmpty && chips.isEmpty
+      subtitle: i.description.isEmpty && i.recipe.isEmpty && who.isEmpty && chips.isEmpty
           ? null
           : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               if (i.description.isNotEmpty) Text(i.description),
+              if (i.recipe.isNotEmpty)
+                Text('מתוך: ${i.recipe}', style: t.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
               if (who.isNotEmpty) Text(who, style: t.textTheme.bodySmall),
               if (chips.isNotEmpty)
                 Padding(

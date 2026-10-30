@@ -138,6 +138,7 @@ test('an item with every optional field is accepted', async () => {
         category: 'Dairy & Eggs',
         remindAt: 5000,
         reminded: false,
+        recipe: 'מרק עדשים',
       }),
     );
     await assertSucceeds(
@@ -155,6 +156,8 @@ const BAD_ITEMS: Record<string, Record<string, unknown>> = {
   'a string date': { date: 'today' },
   'a numeric category': { category: 3 },
   'a 51 character category': { category: 'x'.repeat(51) },
+  'a numeric recipe': { recipe: 3 },
+  'a 201 character recipe': { recipe: 'x'.repeat(201) },
   'a numeric photoPath': { photoPath: 3 },
   'a 301 character photoPath': { photoPath: 'x'.repeat(301) },
   'a string remindAt': { remindAt: 'soon' },

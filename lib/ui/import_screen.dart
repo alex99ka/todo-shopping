@@ -129,16 +129,32 @@ class _ImportScreenState extends State<ImportScreen> {
       // The first recipe's list becomes the main one; after that only the list menu changes it.
       if (Lists.instance.mainListId == null) setMainList(id).catchError((_) {});
       final list = await _ready(id);
+      // Already on the list, not ticked: joined into that line, which then
+      // names this (the newer) recipe.
+      final open = {
+        for (final i in Lists.instance.itemsOf(id) ?? const <Item>[])
+          if (!i.done) thingKey(i.name): i,
+      };
       for (final r in _rows) {
         final name = r.name.text.trim();
         if (name.isEmpty) continue;
         final amount = r.amount.text.trim();
+        final description =
+            amount.isEmpty ? r.note : [amount, if (r.unit.isNotEmpty) unitLabels[r.unit]].join(' ');
+        final twin = open[thingKey(name)];
+        if (twin != null) {
+          final joined = joinAmounts([twin.description, description]);
+          updateItem(id, twin.id, {
+            'description': joined.length > 5000 ? joined.substring(0, 5000) : joined,
+            if (_recipe.isNotEmpty) 'recipe': _recipe,
+          }).catchError((_) {});
+          continue;
+        }
         createItem(list, {
           'name': name,
-          'description': amount.isEmpty
-              ? r.note
-              : [amount, if (r.unit.isNotEmpty) unitLabels[r.unit]].join(' '),
+          'description': description,
           'category': r.category,
+          if (_recipe.isNotEmpty) 'recipe': _recipe,
         }).catchError((_) {});
         recordHistory(list, name, r.category).catchError((_) {});
       }

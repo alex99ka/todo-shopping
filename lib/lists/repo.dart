@@ -64,6 +64,9 @@ class Item {
   String? get doneBy => d['doneBy'] as String?;
   String? get assignee => d['assignee'] as String?;
 
+  /// The recipe book's recipe it was added for; the newest one once joined.
+  String get recipe => '${d['recipe'] ?? ''}';
+
   static int? _ms(Object? v) {
     final n = (v as num?)?.toInt();
     return n == null || n == 0 ? null : n;
@@ -379,6 +382,12 @@ String listLabel(TodoList l) {
 
 // ---- items ----
 
+/// Of lines joined into one, the recipe of the latest added that has one.
+String newestRecipe(Iterable<Item> items) =>
+    (items.toList()..sort((a, b) => b.date.compareTo(a.date)))
+        .map((i) => i.recipe)
+        .firstWhere((r) => r.isNotEmpty, orElse: () => '');
+
 DocumentReference<Map<String, dynamic>> _item(String listId, String id) =>
     _db.doc('lists/$listId/items/$id');
 
@@ -433,10 +442,12 @@ Future<void> joinItems(String listId,
     List<({Item keep, String? name, String description, List<Item> drop})> groups) {
   final b = _db.batch();
   for (final g in groups) {
+    final recipe = newestRecipe([g.keep, ...g.drop]);
     b.update(_item(listId, g.keep.id), {
       'description': g.description.length > 5000 ? g.description.substring(0, 5000) : g.description,
       if (g.name != null && g.name!.isNotEmpty)
         'name': g.name!.length > 500 ? g.name!.substring(0, 500) : g.name,
+      if (recipe.isNotEmpty) 'recipe': recipe,
     });
     for (final i in g.drop) {
       b.delete(_item(listId, i.id));
